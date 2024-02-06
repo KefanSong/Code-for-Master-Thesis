@@ -3,7 +3,7 @@ import argparse
 import gymnasium as gym
 import torch.nn as nn
 import time
-from data_generator_Copy2 import DataGenerator
+from data_generator_two_reward_functions import DataGenerator
 from models import GaussianPolicy, Value
 from environment import get_threshold
 from utils import *
@@ -20,10 +20,10 @@ class FOCOPS:
     def __init__(self,
                  env,
                  policy_net,
-                 value_net,
+                 value_net_list,
                  cvalue_net,
                  pi_optimizer,
-                 vf_optimizer,
+                 vf_optimizer_list,
                  cvf_optimizer,
                  num_epochs,
                  mb_size,
@@ -44,15 +44,15 @@ class FOCOPS:
         self.env = env
 
         self.policy = policy_net
-        self.value_net = value_net
+        self.value_net_list = value_net_list
         self.cvalue_net = cvalue_net
 
         self.pi_optimizer = pi_optimizer
-        self.vf_optimizer = vf_optimizer
+        self.vf_optimizer_list = vf_optimizer_list
         self.cvf_optimizer = cvf_optimizer
 
         self.pi_loss = None
-        self.vf_loss = None
+        self.vf_loss_list = [None]*len(self.value_net_list)
         self.cvf_loss = None
 
         self.num_epochs = num_epochs
@@ -120,16 +120,24 @@ class FOCOPS:
                     old_logprob_b, old_mean_b, old_std_b) in enumerate(loader):
 
 
-                # Update reward critic
-                mse_loss = nn.MSELoss()
-                vf_pred = self.value_net(obs_b)
-                self.vf_loss = mse_loss(vf_pred, vtarg_b)
-                # weight decay
-                for param in self.value_net.parameters():
-                    self.vf_loss += param.pow(2).sum() * self.l2_reg
-                self.vf_optimizer.zero_grad()
-                self.vf_loss.backward()
-                self.vf_optimizer.step()
+                # Update N reward critics
+                # only update one value net for unit testing
+                vars = {}
+                vars['vtarg_b'] = vtarg_b
+                with open('vars.pkl', 'wb') as f:
+                    pickle.dump(vars, f)
+                for n in range(1):
+                    value_net = self.value_net_list[n]
+                    
+                    mse_loss = nn.MSELoss()
+                    vf_pred = value_net(obs_b)
+                    self.vf_loss_list[n] = mse_loss(vf_pred, vtarg_b[:, n, :])
+                    # weight decay
+                    for param in value_net.parameters():
+                        self.vf_loss_list[n] += param.pow(2).sum() * self.l2_reg
+                    self.vf_optimizer_list[n].zero_grad()
+                    self.vf_loss_list[n].backward()
+                    self.vf_optimizer_list[n].step()
 
                 # Update cost critic
                 cvf_pred = self.cvalue_net(obs_b)
@@ -146,15 +154,15 @@ class FOCOPS:
                 logprob, mean, std = self.policy.logprob(obs_b, act_b)
                 kl_new_old = gaussian_kl(mean, std, old_mean_b, old_std_b)
                 ratio = torch.exp(logprob - old_logprob_b)
-                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b - torch.sum(torch.tensor(self.nu.reshape(1, 2, 1)) * cadv_b, dim=1))) \
+                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b[:, 0, :] - torch.sum(torch.tensor(self.nu.reshape(1, 2, 1)) * cadv_b, dim=1))) \
                           * (kl_new_old.detach() <= self.eta).type(dtype)
 
                 vars = {}
                 vars['nu'] = self.nu
                 vars['cadv_b'] = cadv_b
                 vars['adv_b'] = adv_b
-                # with open('vars.pkl', 'wb') as file:
-                #     pickle.dump(vars, file)
+                with open('vars.pkl', 'wb') as file:
+                    pickle.dump(vars, file)
                 # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * adv_b*(1.0 - self.nu[0]+self.nu[1])) \
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
 
@@ -187,13 +195,14 @@ class FOCOPS:
 
         # Save models
         self.logger.save_model('policy_params', self.policy.state_dict())
-        self.logger.save_model('value_params', self.value_net.state_dict())
+        # only saving the first value net, first vf optimizer and first value loss for now
+        self.logger.save_model('value_params', self.value_net_list[0].state_dict())
         self.logger.save_model('cvalue_params', self.cvalue_net.state_dict())
         self.logger.save_model('pi_optimizer', self.pi_optimizer.state_dict())
-        self.logger.save_model('vf_optimizer', self.vf_optimizer.state_dict())
+        self.logger.save_model('vf_optimizer', self.vf_optimizer_list[0].state_dict())
         self.logger.save_model('cvf_optimizer', self.cvf_optimizer.state_dict())
         self.logger.save_model('pi_loss', self.pi_loss)
-        self.logger.save_model('vf_loss', self.vf_loss)
+        self.logger.save_model('vf_loss', self.vf_loss_list[0])
         self.logger.save_model('cvf_loss', self.cvf_loss)
 
 
@@ -265,21 +274,30 @@ def train(args):
         # initialize new policy net, value nets and logger for each group
         # Initialize neural nets
         policy = GaussianPolicy(obs_dim, act_dim, args.hidden_size, args.activation, args.logstd)
-        value_net = Value(obs_dim, args.hidden_size, args.activation)
+        value_net_list = []
+        for n in range(2):
+            value_net_list.append(Value(obs_dim, args.hidden_size, args.activation))
+        # value_net = Value(obs_dim, args.hidden_size, args.activation)
         cvalue_net = Value(obs_dim, args.hidden_size, args.activation)
         policy.to(device)
-        value_net.to(device)
+        
+        for value_net in value_net_list:
+            value_net.to(device)
         cvalue_net.to(device)
         
         # Initialize optimizer
         pi_optimizer = torch.optim.Adam(policy.parameters(), args.pi_lr)
-        vf_optimizer = torch.optim.Adam(value_net.parameters(), args.vf_lr)
+        vf_optimizer_list = []
+        for n in range(2):
+            vf_optimizer_list.append(torch.optim.Adam(value_net.parameters(), args.vf_lr))
         cvf_optimizer = torch.optim.Adam(cvalue_net.parameters(), args.cvf_lr)
         
         # Initialize learning rate scheduler
         lr_lambda = lambda it: max(1.0 - it / args.max_iter_num, 0)
         pi_scheduler = torch.optim.lr_scheduler.LambdaLR(pi_optimizer, lr_lambda=lr_lambda)
-        vf_scheduler = torch.optim.lr_scheduler.LambdaLR(vf_optimizer, lr_lambda=lr_lambda)
+        vf_scheduler_list = []
+        for n in range(2):
+            vf_scheduler_list.append(torch.optim.lr_scheduler.LambdaLR(vf_optimizer_list[n], lr_lambda=lr_lambda))
         cvf_scheduler = torch.optim.lr_scheduler.LambdaLR(cvf_optimizer, lr_lambda=lr_lambda)
         
         # Store hyperparameters for log
@@ -287,14 +305,16 @@ def train(args):
         
         # Initialize RunningStat for state normalization, score queue, logger
         running_stat = RunningStats(clip=5)
+
+        
         score_queue = deque(maxlen=100)
         cscore_queue = deque(maxlen=100)
         logger = Logger(hyperparams)
 
         # logger = Logger(hyperparams, z)
         # Initialize and train FOCOPS agent
-        agents.append(FOCOPS(env, policy, value_net, cvalue_net,
-                       pi_optimizer, vf_optimizer, cvf_optimizer,
+        agents.append(FOCOPS(env, policy, value_net_list, cvalue_net,
+                       pi_optimizer, vf_optimizer_list, cvf_optimizer,
                        args.num_epochs, args.mb_size,
                        args.c_gamma, args.lam, args.delta, args.eta,
                        args.nu, args.nu_lr, args.nu_max, cost_lim,
@@ -324,7 +344,7 @@ def train(args):
     
                 # sampling 10 times more trajectories when estimating return for the fairness constraint.         
                 data_generator = DataGenerator(obs_dim, act_dim, args.batch_size*10, args.max_eps_len)
-                rollouts = data_generator.run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
+                rollouts = data_generator.run_traj(env, agent.policy, agent.value_net_list, agent.cvalue_net,
                                                   running_stat, agent.score_queue, agent.cscore_queue,
                                                   args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
                                                   dtype, device, args.constraint)
@@ -361,7 +381,7 @@ def train(args):
             
                 env = envs[z]
                 data_generator = DataGenerator(obs_dim, act_dim, args.batch_size, args.max_eps_len)
-                rollouts = data_generator.run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
+                rollouts = data_generator.run_traj(env, agent.policy, agent.value_net_list, agent.cvalue_net,
                                               running_stat, agent.score_queue, agent.cscore_queue,
                                               args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
                                               dtype, device, args.constraint)
@@ -372,7 +392,8 @@ def train(args):
                 print('b: ', b)
                 # Update learning rates
                 pi_scheduler.step()
-                vf_scheduler.step()
+                for vf_scheduler in vf_scheduler_list:
+                    vf_scheduler.step()
                 cvf_scheduler.step()
             
                 # Update time and running stat
@@ -394,8 +415,7 @@ def train(args):
                 print('avg return: ', rollouts['avg_return'])
                 print('len score queue: ', len(agent.score_queue))
 
-                # if k == 0 and z == 0:
-                #     break
+
 
         
         

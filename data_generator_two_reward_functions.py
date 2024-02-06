@@ -22,8 +22,8 @@ class DataGenerator:
         # Batch buffer
         self.obs_buf = np.zeros((batch_size, obs_dim), dtype=np.float32)
         self.act_buf = np.zeros((batch_size, act_dim),  dtype=np.float32)
-        self.vtarg_buf = np.zeros((batch_size, 1), dtype=np.float32)
-        self.adv_buf = np.zeros((batch_size, 1), dtype=np.float32)
+        self.vtarg_buf = np.zeros((batch_size,2, 1), dtype=np.float32)
+        self.adv_buf = np.zeros((batch_size,2, 1), dtype=np.float32)
         self.cvtarg_buf = np.zeros((batch_size, 1), dtype=np.float32)
         self.cadv_buf = np.zeros((batch_size,2, 1), dtype=np.float32)
 
@@ -40,7 +40,7 @@ class DataGenerator:
         # Pointer
         self.ptr = 0
 
-    def run_traj(self, env, policy, value_net, cvalue_net, running_stat,
+    def run_traj(self, env, policy, value_net_list, cvalue_net, running_stat,
                  score_queue, cscore_queue, gamma, c_gamma, gae_lam, c_gae_lam,
                  dtype, device, constraint):
 
@@ -128,18 +128,23 @@ class DataGenerator:
 
 
             # Calculate advantage
-            adv_eps, vtarg_eps = self.get_advantage(value_net, gamma, gae_lam, dtype, device, mode='reward')
+            
+            n = 0
+            adv_eps, vtarg_eps = self.get_advantage(value_net_list[n], gamma, gae_lam, dtype, device, mode='reward', reward_idx = n)
             # cadv_eps, cvtarg_eps = self.get_advantage(cvalue_net, c_gamma, c_gae_lam, dtype, device, mode='cost')
-            cadv_eps, cvtarg_eps = self.get_advantage(value_net, c_gamma, c_gae_lam, dtype, device, mode='cost')
+            cadv_eps, cvtarg_eps = self.get_advantage(value_net_list[n], c_gamma, c_gae_lam, dtype, device, mode='cost')
             
             # try stacking multiple cost advantage estimates. 
             cadv_eps_stack = np.stack((cadv_eps, -cadv_eps), axis=1)
+
+            vtarg_eps_stack = np.stack((vtarg_eps, vtarg_eps), axis=1)
+            adv_eps_stack = np.stack((adv_eps, adv_eps), axis=1)
 
 
             # Update batch buffer
             start_idx, end_idx = self.ptr, self.ptr + self.eps_len
             self.obs_buf[start_idx: end_idx], self.act_buf[start_idx: end_idx] = self.obs_eps, self.act_eps
-            self.vtarg_buf[start_idx: end_idx], self.adv_buf[start_idx: end_idx] = vtarg_eps, adv_eps
+            self.vtarg_buf[start_idx: end_idx], self.adv_buf[start_idx: end_idx] = vtarg_eps_stack, adv_eps_stack
             self.cvtarg_buf[start_idx: end_idx], self.cadv_buf[start_idx: end_idx] = cvtarg_eps, cadv_eps_stack
 
 
@@ -163,7 +168,8 @@ class DataGenerator:
         std_cost = np.std(cost_ret_hist)
 
         # Normalize advantage functions
-        self.adv_buf = (self.adv_buf - self.adv_buf.mean()) / (self.adv_buf.std() + 1e-6)
+        # self.adv_buf = (self.adv_buf - self.adv_buf.mean()) / (self.adv_buf.std() + 1e-6)
+        self.adv_buf = (self.adv_buf - self.adv_buf.mean(axis=0)) / (self.adv_buf.std(axis=0) + 1e-6)
         self.cadv_buf = (self.cadv_buf - self.cadv_buf.mean(axis=0)) / (self.cadv_buf.std(axis=0) + 1e-6)
 
 
@@ -175,7 +181,7 @@ class DataGenerator:
     
 
 
-    def get_advantage(self, value_net, gamma, gae_lam, dtype, device, mode='reward'):
+    def get_advantage(self, value_net, gamma, gae_lam, dtype, device, mode='reward', reward_idx=0):
         gae_delta = np.zeros((self.eps_len, 1))
         adv_eps =  np.zeros((self.eps_len, 1))
         # Check if terminal state, if terminal V(S_T) = 0, else V(S_T)
