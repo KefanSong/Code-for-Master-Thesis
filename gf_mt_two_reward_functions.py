@@ -101,7 +101,7 @@ class FOCOPS:
         print('avg_cost: ', avg_cost)
 
         # stack average cost for two constraints
-        avg_cost_stack = np.array((avg_cost, -avg_cost))
+        avg_cost_stack = np.array((avg_cost[0], -avg_cost[0], avg_cost[1], -avg_cost[1]))
 
 
         # Update nu
@@ -122,10 +122,7 @@ class FOCOPS:
 
                 # Update N reward critics
                 # only update one value net for unit testing
-                vars = {}
-                vars['vtarg_b'] = vtarg_b
-                with open('vars.pkl', 'wb') as f:
-                    pickle.dump(vars, f)
+
                 for n in range(1):
                     value_net = self.value_net_list[n]
                     
@@ -154,17 +151,12 @@ class FOCOPS:
                 logprob, mean, std = self.policy.logprob(obs_b, act_b)
                 kl_new_old = gaussian_kl(mean, std, old_mean_b, old_std_b)
                 ratio = torch.exp(logprob - old_logprob_b)
-                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b[:, 0, :] - torch.sum(torch.tensor(self.nu.reshape(1, 2, 1)) * cadv_b, dim=1))) \
-                          * (kl_new_old.detach() <= self.eta).type(dtype)
 
-                vars = {}
-                vars['nu'] = self.nu
-                vars['cadv_b'] = cadv_b
-                vars['adv_b'] = adv_b
-                with open('vars.pkl', 'wb') as file:
-                    pickle.dump(vars, file)
-                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * adv_b*(1.0 - self.nu[0]+self.nu[1])) \
+                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * adv_b[:, 0, :]*(1.0 - self.nu[0]+self.nu[1])) \
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
+
+                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b[:, 0, :]*(1.0 - self.nu[0]+self.nu[1]) + adv_b[:, 1, :]*(1.0 - self.nu[2]+self.nu[3]))) \
+                          * (kl_new_old.detach() <= self.eta).type(dtype)
 
                 self.pi_loss = self.pi_loss.mean()
                 self.pi_optimizer.zero_grad()
@@ -183,9 +175,12 @@ class FOCOPS:
 
 
         # Store everything in log
-        self.logger.update('MinR', np.min(self.score_queue))
-        self.logger.update('MaxR', np.max(self.score_queue))
-        self.logger.update('AvgR', np.mean(self.score_queue))
+        self.logger.update('MinR', np.min(self.score_queue[0]))
+        self.logger.update('MaxR', np.max(self.score_queue[0]))
+        self.logger.update('AvgR', np.mean(self.score_queue[0]))
+
+        self.logger.update('AvgR2', np.mean(self.score_queue[1]))
+        
         self.logger.update('MinC', np.min(self.cscore_queue))
         self.logger.update('MaxC', np.max(self.cscore_queue))
         self.logger.update('AvgC', np.mean(self.cscore_queue))
@@ -231,34 +226,6 @@ def train(args):
     
     for env in envs:
         env.reset(seed=args.seed)
-
-    # # Initialize neural nets
-    # policy = GaussianPolicy(obs_dim, act_dim, args.hidden_size, args.activation, args.logstd)
-    # value_net = Value(obs_dim, args.hidden_size, args.activation)
-    # cvalue_net = Value(obs_dim, args.hidden_size, args.activation)
-    # policy.to(device)
-    # value_net.to(device)
-    # cvalue_net.to(device)
-
-    # # Initialize optimizer
-    # pi_optimizer = torch.optim.Adam(policy.parameters(), args.pi_lr)
-    # vf_optimizer = torch.optim.Adam(value_net.parameters(), args.vf_lr)
-    # cvf_optimizer = torch.optim.Adam(cvalue_net.parameters(), args.cvf_lr)
-
-    # # Initialize learning rate scheduler
-    # lr_lambda = lambda it: max(1.0 - it / args.max_iter_num, 0)
-    # pi_scheduler = torch.optim.lr_scheduler.LambdaLR(pi_optimizer, lr_lambda=lr_lambda)
-    # vf_scheduler = torch.optim.lr_scheduler.LambdaLR(vf_optimizer, lr_lambda=lr_lambda)
-    # cvf_scheduler = torch.optim.lr_scheduler.LambdaLR(cvf_optimizer, lr_lambda=lr_lambda)
-
-    # # Store hyperparameters for log
-    # hyperparams = vars(args)
-
-    # # Initialize RunningStat for state normalization, score queue, logger
-    # running_stat = RunningStats(clip=5)
-    # score_queue = deque(maxlen=100)
-    # cscore_queue = deque(maxlen=100)
-    # logger = Logger(hyperparams)
 
     start_time = time.time()
     agents = []
@@ -307,11 +274,11 @@ def train(args):
         running_stat = RunningStats(clip=5)
 
         
-        score_queue = deque(maxlen=100)
+        score_queue = [deque(maxlen=100), deque(maxlen=100)]
         cscore_queue = deque(maxlen=100)
-        logger = Logger(hyperparams)
+        # logger = Logger(hyperparams)
 
-        # logger = Logger(hyperparams, z)
+        logger = Logger(hyperparams, z)
         # Initialize and train FOCOPS agent
         agents.append(FOCOPS(env, policy, value_net_list, cvalue_net,
                        pi_optimizer, vf_optimizer_list, cvf_optimizer,
@@ -319,6 +286,8 @@ def train(args):
                        args.c_gamma, args.lam, args.delta, args.eta,
                        args.nu, args.nu_lr, args.nu_max, cost_lim,
                        args.l2_reg, score_queue, cscore_queue, logger))
+
+        
 
 
     # update one group at a time
@@ -332,7 +301,7 @@ def train(args):
             
             groups_returns = []
             # thresholds for two constraint functions
-            b = np.zeros((2))
+            b = np.zeros((4))
             
             for z1 in range(args.num_groups):
         
@@ -342,7 +311,9 @@ def train(args):
                 
                 # agent.logger.save_model('iter', iter)
     
-                # sampling 10 times more trajectories when estimating return for the fairness constraint.         
+                # sampling 10 times more trajectories when estimating return for the fairness constraint.
+
+
                 data_generator = DataGenerator(obs_dim, act_dim, args.batch_size*10, args.max_eps_len)
                 rollouts = data_generator.run_traj(env, agent.policy, agent.value_net_list, agent.cvalue_net,
                                                   running_stat, agent.score_queue, agent.cscore_queue,
@@ -353,8 +324,10 @@ def train(args):
                 if z != z1:
                     # constraint threshold b when solving a CPO problem for a particular group z
                     # b = args.group_fairness_threshold + groups_returns[z1]
-                    b[0] = args.group_fairness_threshold + groups_returns[z1]
-                    b[1] = args.group_fairness_threshold - groups_returns[z1]
+                    b[0] = args.group_fairness_threshold + groups_returns[z1][0]
+                    b[1] = args.group_fairness_threshold - groups_returns[z1][0]
+                    b[2] = args.group_fairness_threshold + groups_returns[z1][1]
+                    b[3] = args.group_fairness_threshold - groups_returns[z1][1]
                 
             print(groups_returns)
             
@@ -377,10 +350,12 @@ def train(args):
 
             for iter in range(args.max_iter_num):
 
-            
+
+                with open('score_queue1.pkl', 'wb') as f:
+                    pickle.dump(agent.score_queue, f)
             
                 env = envs[z]
-                data_generator = DataGenerator(obs_dim, act_dim, args.batch_size, args.max_eps_len)
+                data_generator = DataGenerator(obs_dim, act_dim, args.batch_size*10, args.max_eps_len)
                 rollouts = data_generator.run_traj(env, agent.policy, agent.value_net_list, agent.cvalue_net,
                                               running_stat, agent.score_queue, agent.cscore_queue,
                                               args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
@@ -406,11 +381,11 @@ def train(args):
                 
                 
                 # stop training if the score queue stopped improving for 10 consecutive iterations.
-                prev_scores.append(np.mean(agent.score_queue))
+                prev_scores.append(np.mean(agent.score_queue[0]))
 
-                if iter >=30:
-                    print('abs diff: ', np.abs(prev_scores[iter-10] - np.mean(agent.score_queue)))
-                    if np.abs(prev_scores[iter-10] - np.mean(agent.score_queue)) < 3:
+                if iter >=10:
+                    print('abs diff: ', np.abs(prev_scores[iter-10] - np.mean(agent.score_queue[0])))
+                    if np.abs(prev_scores[iter-10] - np.mean(agent.score_queue[0])) < np.mean(agent.score_queue[0])/30:
                         break
                 print('avg return: ', rollouts['avg_return'])
                 print('len score queue: ', len(agent.score_queue))
@@ -466,7 +441,7 @@ if __name__ == '__main__':
                         help='KL bound for indicator function (default: 0.02)')
     # parser.add_argument('--nu', type=float, default=0,
     #                     help='Cost coefficient (default: 0)')
-    parser.add_argument('--nu', type=float, default=[0, 0],
+    parser.add_argument('--nu', type=float, default=[0, 0, 0, 0],
                         help='Cost coefficient (default: 0)')
     parser.add_argument('--nu_lr', type=float, default=0.01,
                         help='Cost coefficient learning rate (default: 0.01)')

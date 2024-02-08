@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from utils import torch_to_numpy
+import pickle
 
 
 class DataGenerator:
@@ -31,7 +32,7 @@ class DataGenerator:
         self.obs_eps = np.zeros((max_eps_len, obs_dim),  dtype=np.float32)
         self.next_obs_eps = np.zeros((max_eps_len, obs_dim),  dtype=np.float32)
         self.act_eps = np.zeros((max_eps_len, act_dim),  dtype=np.float32)
-        self.rew_eps = np.zeros((max_eps_len, 1),  dtype=np.float32)
+        self.rew_eps = [np.zeros((max_eps_len, 1),  dtype=np.float32)]*2
         self.cost_eps = np.zeros((max_eps_len, 1), dtype=np.float32)
         self.eps_len = 0
         self.not_terminal = 1
@@ -41,14 +42,17 @@ class DataGenerator:
         self.ptr = 0
 
     def run_traj(self, env, policy, value_net_list, cvalue_net, running_stat,
-                 score_queue, cscore_queue, gamma, c_gamma, gae_lam, c_gae_lam,
+                 score_queue_list, cscore_queue, gamma, c_gamma, gae_lam, c_gae_lam,
                  dtype, device, constraint):
 
         batch_idx = 0
 
         ret_hist = []
-        cost_ret_hist = []
+        ret_hist2 = []
 
+        cost_ret_hist = []
+        cost_ret_hist2 = []
+     
         avg_eps_len = 0
         num_eps = 0
 
@@ -57,7 +61,9 @@ class DataGenerator:
             if running_stat is not None:
                 obs = running_stat.normalize(obs)
             ret_eps = 0
+            ret_eps2 = 0
             cost_ret_eps = 0
+            cost_ret_eps2 = 0
 
             for t in range(self.max_eps_len):
                 act = policy.get_act(torch.Tensor(obs).to(dtype).to(device))
@@ -69,7 +75,11 @@ class DataGenerator:
                 # add a higher penalty for actions with larger magnitude. 
                 
                 v = info['x_velocity']
-                rew2 = v - 0.3*np.abs(act).sum()
+                if batch_idx == 0:
+                    with open('action.pkl', 'wb') as f:
+                        pickle.dump(act, f)
+                # rew2 = v - 0.2*np.abs(act).sum()
+                rew2 = rew - 0.1*np.abs(act).mean()
 
                 
                 cost_vector = [0]*2
@@ -82,12 +92,16 @@ class DataGenerator:
                     cost = info['cost']
                 elif constraint == 'group fairness':
                     cost = rew
+                    cost2 = rew2
                     # cost_vector[0] = rew
                     # cost_vector[1] = -rew
 
+                # calculate two ret_eps for two tasks.
                 ret_eps += rew
+                ret_eps2 += rew2
                 # cost_ret_eps += (c_gamma ** t) * cost
                 cost_ret_eps += cost
+                cost_ret_eps2 += cost2
 
                 if running_stat is not None:
                     next_obs = running_stat.normalize(next_obs)
@@ -96,7 +110,10 @@ class DataGenerator:
                 self.obs_eps[t] = obs
                 self.act_eps[t] = act
                 self.next_obs_eps[t] = next_obs
-                self.rew_eps[t] = rew
+
+                # collect rewards seperately for the two tasks. 
+                self.rew_eps[0][t] = rew
+                self.rew_eps[1][t] = rew2
                 self.cost_eps[t] = cost
 
                 obs = next_obs
@@ -108,13 +125,21 @@ class DataGenerator:
                 if done or t == self.max_eps_len - 1:
                     if done:
                         self.not_terminal = 0
-                    score_queue.append(ret_eps)
+                    score_queue_list[0].append(ret_eps)
+                    score_queue_list[1].append(ret_eps2)
                     cscore_queue.append(cost_ret_eps)
+
+                    with open('score_queue_list.pkl', 'wb') as f:
+                        pickle.dump([score_queue_list[0], ret_eps,ret_eps2 ], f)
 
                     # for group fairness, collect performance of (each agent's) return
                     ret_hist.append(ret_eps)
-                    cost_ret_hist.append(cost_ret_eps)
+                    ret_hist2.append(ret_eps2)
 
+                    cost_ret_hist.append(cost_ret_eps)
+                    cost_ret_hist2.append(cost_ret_eps2)
+
+                    
                     num_eps += 1
                     avg_eps_len += (self.eps_len - avg_eps_len) / num_eps
 
@@ -123,23 +148,31 @@ class DataGenerator:
 
             # Store episode buffer
             self.obs_eps, self.next_obs_eps = self.obs_eps[:self.eps_len], self.next_obs_eps[:self.eps_len]
-            self.act_eps, self.rew_eps = self.act_eps[:self.eps_len], self.rew_eps[:self.eps_len]
+            self.act_eps, self.rew_eps[0] = self.act_eps[:self.eps_len], self.rew_eps[0][:self.eps_len]
+            self.rew_eps[1] = self.rew_eps[1][:self.eps_len]
             self.cost_eps = self.cost_eps[:self.eps_len]
 
 
             # Calculate advantage
             
-            n = 0
-            adv_eps, vtarg_eps = self.get_advantage(value_net_list[n], gamma, gae_lam, dtype, device, mode='reward', reward_idx = n)
+
+            adv_eps_list = []
+            vtarg_eps_list = []
+            for n in range(2):
+                adv_eps, vtarg_eps = self.get_advantage(value_net_list[n], gamma, gae_lam, dtype, device, mode='reward', reward_idx = n)
+                adv_eps_list.append(adv_eps)
+                vtarg_eps_list.append(vtarg_eps)
             # cadv_eps, cvtarg_eps = self.get_advantage(cvalue_net, c_gamma, c_gae_lam, dtype, device, mode='cost')
             cadv_eps, cvtarg_eps = self.get_advantage(value_net_list[n], c_gamma, c_gae_lam, dtype, device, mode='cost')
             
             # try stacking multiple cost advantage estimates. 
             cadv_eps_stack = np.stack((cadv_eps, -cadv_eps), axis=1)
 
-            vtarg_eps_stack = np.stack((vtarg_eps, vtarg_eps), axis=1)
-            adv_eps_stack = np.stack((adv_eps, adv_eps), axis=1)
+            # vtarg_eps_stack = np.stack((vtarg_eps, vtarg_eps), axis=1)
+            # adv_eps_stack = np.stack((adv_eps, adv_eps), axis=1)
 
+            vtarg_eps_stack = np.stack(vtarg_eps_list, axis=1)
+            adv_eps_stack = np.stack(adv_eps_list, axis=1)
 
             # Update batch buffer
             start_idx, end_idx = self.ptr, self.ptr + self.eps_len
@@ -156,15 +189,21 @@ class DataGenerator:
             self.obs_eps = np.zeros((self.max_eps_len, self.obs_dim), dtype=np.float32)
             self.next_obs_eps = np.zeros((self.max_eps_len, self.obs_dim), dtype=np.float32)
             self.act_eps = np.zeros((self.max_eps_len, self.act_dim), dtype=np.float32)
-            self.rew_eps = np.zeros((self.max_eps_len, 1), dtype=np.float32)
+            self.rew_eps = [np.zeros((self.max_eps_len, 1), dtype=np.float32)]*2
             self.cost_eps = np.zeros((self.max_eps_len, 1), dtype=np.float32)
             self.eps_len = 0
             self.not_terminal = 1
 
         # for group fairness, calculate average return
-        avg_ret = np.mean(ret_hist)
+        # avg_ret = np.mean(ret_hist)
+        avg_ret = np.mean(np.stack((ret_hist, ret_hist2)), axis=1)
         
-        avg_cost = np.mean(cost_ret_hist)
+        # avg_cost = np.mean(cost_ret_hist)
+
+        vars = [cost_ret_hist, cost_ret_hist2]
+        # with open('vars.pkl', 'wb') as f:
+        #     pickle.dump(vars, f)
+        avg_cost = np.mean(np.stack((cost_ret_hist, cost_ret_hist2)), axis=1)
         std_cost = np.std(cost_ret_hist)
 
         # Normalize advantage functions
@@ -197,7 +236,7 @@ class DataGenerator:
 
             # Calculate delta and advantage
             if mode == 'reward':
-                gae_delta[t] = self.rew_eps[t] + gamma * next_val * status[t] - current_val
+                gae_delta[t] = self.rew_eps[reward_idx][t] + gamma * next_val * status[t] - current_val
             elif mode =='cost':
                 gae_delta[t] = self.cost_eps[t] + gamma * next_val * status[t] - current_val
             adv_eps[t] = gae_delta[t] + gamma * gae_lam * prev_adv

@@ -5,12 +5,13 @@ from utils.misc import println
 
 class Logger:
 
-    def __init__(self, hyperparams):
+    def __init__(self, hyperparams, group):
 
-        self.log_data = {'time': 0,
+        self.log_data = {'time': [],
                          'MinR': [],
                          'MaxR': [],
                          'AvgR': [],
+                         'AvgR2': [],
                          'MinC': [],
                          'MaxC': [],
                          'AvgC': [],
@@ -31,7 +32,7 @@ class Logger:
 
         self.hyperparams = hyperparams
         self.iter = 0
-        # self.group = group
+        self.group = group
 
 
 
@@ -50,7 +51,7 @@ class Logger:
         # Print results
         println('Results for Iteration:', self.iter + 1)
         println('Number of Samples:', (self.iter + 1) * batch_size)
-        println('Time: {:.2f}'.format(self.log_data['time']))
+        println('Time: {:.2f}'.format(self.log_data['time'][-1]))
         println('MinR: {:.2f}| MaxR: {:.2f}| AvgR: {:.2f}'.format(self.log_data['MinR'][-1],
                                                                   self.log_data['MaxR'][-1],
                                                                   self.log_data['AvgR'][-1]))
@@ -63,20 +64,21 @@ class Logger:
 
 
         # Save Logger
-        env_id = self.hyperparams['env_id']
+        # env_id = self.hyperparams['env_id']
         constraint = self.hyperparams['constraint']
         seed = self.hyperparams['seed']
         
         
 
-        envname = env_id.partition(':')[-1] if ':' in env_id else env_id
-
+        # envname = env_id.partition(':')[-1] if ':' in env_id else env_id
+        envnames = ['HalfCheetah-v4', 'BigFootHalfCheetah']
+        envname = envnames[self.group]
         # create a different log for different group 
         # 'group', str(self.group),
         directory = '_'.join(['focops', 'results'])
-        filename1 = '_'.join(['focops',  constraint, envname, 'log_data_seed', str(seed)]) + '.pkl'
-        filename2 = '_'.join(['focops',  constraint, envname, 'hyperparams_seed', str(seed)]) + '.pkl'
-        filename3 = '_'.join(['focops',  constraint, envname, 'models_seed', str(seed)]) + '.pth'
+        filename1 = '_'.join(['focops',  constraint, str(self.group),envname,  'log_data_seed', str(seed)]) + '.pkl'
+        filename2 = '_'.join(['focops',  constraint, str(self.group),envname,  'hyperparams_seed', str(seed)]) + '.pkl'
+        filename3 = '_'.join(['focops',  constraint, str(self.group),envname,  'models_seed', str(seed)]) + '.pth'
 
         if not os.path.exists(directory):
             os.mkdir(directory)
