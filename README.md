@@ -1,20 +1,19 @@
-Implementation for First Order Constraint Optimization in Policy Space (FOCOPS).
+Implementation for Multi-Task Group Fairness Reinforcement Learning
 
-Link to paper https://arxiv.org/abs/2002.06506
 
 ### Requirements
 [pytorch >= 1.3.1](https://pytorch.org/) <br>
-[gym >= 0.15.3](https://github.com/openai/gym) <br>
-[mujoco-py >= 1.50.1.0](https://github.com/openai/mujoco-py) <br>
-For the circle experiments, please also install circle environments at
-https://github.com/ymzhang01/mujoco-circle.
+[gymnasium >= 0.27.0](https://github.com/openai/gym](https://gymnasium.farama.org/gymnasium_release_notes/index.html)) <br>
+[mujoco >= 3.1.2](https://github.com/openai/mujoco-py](https://mujoco.org)) <br>
+
+
 
 ### Implementation
-Example: Humanoid task in the robots with speed 
-limits experiments (using the default parameters)
+Example: HalfCheetah group and BigFoot HalfCheetah group under two tasks, one with default reward, the other with added penalty for action magnitude.
+
 ```
-python focops_main.py --env-id='Humanoid-v3' --constraint='velocity'
+python3 gf_mt_two_constraints.py --env-id='big_foot_half_cheetah' --batch-size=1024 --group-fairness-threshold=100 --max-iter-num=500
 ```
 
 
-
+Return plots of one seed is shown in the file [Plotting Return.ipynb](https://github.com/KefanSong/Multi-Task-Group-Fairness-Reinforcement-Learning/blob/main/Plotting%20Return.ipynb)
