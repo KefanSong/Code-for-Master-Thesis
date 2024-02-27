@@ -3,7 +3,7 @@ import argparse
 import gymnasium as gym
 import torch.nn as nn
 import time
-from data_generator import DataGenerator
+from data_generator_Copy2 import DataGenerator
 from models import GaussianPolicy, Value
 from environment import get_threshold
 from utils import *
@@ -96,13 +96,21 @@ class FOCOPS:
         loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=self.mb_size, shuffle=True)
         avg_cost = rollout['avg_cost']
 
+        
 
-        # Update nu
-        self.nu += self.nu_lr * (avg_cost - self.cost_lim)
-        if self.nu < 0:
-            self.nu = 0
-        elif self.nu > self.nu_max:
-            self.nu = self.nu_max
+        # # Update nu
+        self.nu[0] += self.nu_lr * (avg_cost - self.cost_lim)
+
+        if self.nu[0] < 0:
+            self.nu[0] = 0
+        elif self.nu[0] > self.nu_max:
+            self.nu[0] = self.nu_max
+
+        # # two constraint's modification
+        # avg_cost_stack = np.array((avg_cost, -avg_cost))
+
+        # self.nu += self.nu_lr * (avg_cost_stack - self.cost_lim)
+        # self.nu = np.clip(self.nu, a_min=0, a_max= self.nu_max)
 
 
         for epoch in range(self.num_epochs):
@@ -137,8 +145,21 @@ class FOCOPS:
                 logprob, mean, std = self.policy.logprob(obs_b, act_b)
                 kl_new_old = gaussian_kl(mean, std, old_mean_b, old_std_b)
                 ratio = torch.exp(logprob - old_logprob_b)
-                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b - self.nu * cadv_b)) \
+
+                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b)) \
+                #           * (kl_new_old.detach() <= self.eta).type(dtype)
+
+                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b - self.nu[0] * cadv_b[:,0,:])) \
                           * (kl_new_old.detach() <= self.eta).type(dtype)
+
+
+                # # two constraint's update for pi:
+                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b - torch.sum(torch.tensor(self.nu.reshape(1, 2, 1)) * cadv_b, dim=1))) \
+                #           * (kl_new_old.detach() <= self.eta).type(dtype)
+                
+                ## original focops main update with scalar nu
+                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b)) \
+                #           * (kl_new_old.detach() <= self.eta).type(dtype)
                 self.pi_loss = self.pi_loss.mean()
                 self.pi_optimizer.zero_grad()
                 self.pi_loss.backward()
@@ -162,7 +183,10 @@ class FOCOPS:
         self.logger.update('MinC', np.min(self.cscore_queue))
         self.logger.update('MaxC', np.max(self.cscore_queue))
         self.logger.update('AvgC', np.mean(self.cscore_queue))
-        self.logger.update('nu', self.nu)
+        # self.logger.update('nu', self.nu)
+
+        self.logger.update('nu0', self.nu[0])
+        self.logger.update('nu1', self.nu[1])
 
 
         # Save models
@@ -179,20 +203,16 @@ class FOCOPS:
 
 def train(args):
 
+
     # Initialize data type
     dtype = torch.float32
     torch.set_default_dtype(dtype)
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-
+    # Initialize environment
     env = BigFootHalfCheetahEnv()
     envname = 'BigFootHalfCheetah'
-    # Initialize environment
-    # if args.env_id == 'big_foot_half_cheetah':
-    #     env = CustomHalfCheetahEnv('big_foot_half_cheetah.xml')
-    # else:
-    #     env = gym.make(args.env_id)
-    # envname = env.spec.id
+    env.reset(seed=args.seed)
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
 
@@ -200,7 +220,6 @@ def train(args):
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     # env.seed(args.seed)
-    env.reset(seed=args.seed)
 
     # Initialize neural nets
     policy = GaussianPolicy(obs_dim, act_dim, args.hidden_size, args.activation, args.logstd)
@@ -228,7 +247,7 @@ def train(args):
     running_stat = RunningStats(clip=5)
     score_queue = deque(maxlen=100)
     cscore_queue = deque(maxlen=100)
-    logger = Logger(hyperparams)
+    logger = Logger(hyperparams, 1)
 
     # Get constraint bounds
     cost_lim = get_threshold(envname, constraint=args.constraint)
@@ -271,9 +290,210 @@ def train(args):
         agent.logger.dump()
 
 
+    
+
+
+    # Initialize data type
+    dtype = torch.float32
+    torch.set_default_dtype(dtype)
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
+    # collect a list of environment
+    envs = []
+    
+    env = BigFootHalfCheetahEnv()
+    envname = 'BigFootHalfCheetah'
+    env.reset(seed=args.seed)
+    envs.append(env)
+
+    env = gym.make('HalfCheetah-v4')
+    envname = 'HalfCheetah-v3'
+    env.reset(seed=args.seed)
+    envs.append(env)
+    
+    # Initialize environment
+    # if args.env_id == 'big_foot_half_cheetah':
+    #     env = CustomHalfCheetahEnv('big_foot_half_cheetah.xml')
+    # else:
+    #     env = gym.make(args.env_id)
+    # envname = env.spec.id
+    obs_dim = env.observation_space.shape[0]
+    act_dim = env.action_space.shape[0]
+
+    # Initialize random seeds
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    # env.seed(args.seed)
+    
+    agents_components = []
+    agents = []
+
+
+    for z in range(2):
+        env = envs[z]
+        
+        # Initialize neural nets
+        agent_components = {}
+        agent_components['env'] = env 
+        agent_components['policy'] = GaussianPolicy(obs_dim, act_dim, args.hidden_size, args.activation, args.logstd)
+        agent_components['value_net'] = Value(obs_dim, args.hidden_size, args.activation)
+        agent_components['cvalue_net'] = Value(obs_dim, args.hidden_size, args.activation)
+        agent_components['policy'].to(device)
+        agent_components['value_net'].to(device)
+        agent_components['cvalue_net'].to(device)
+    
+        # Initialize optimizer
+        agent_components['pi_optimizer'] = torch.optim.Adam(agent_components['policy'].parameters(), args.pi_lr)
+        agent_components['vf_optimizer'] = torch.optim.Adam(agent_components['value_net'].parameters(), args.vf_lr)
+        agent_components['cvf_optimizer'] = torch.optim.Adam(agent_components['cvalue_net'].parameters(), args.cvf_lr)
+    
+        # Initialize learning rate scheduler
+        lr_lambda = lambda it: max(1.0 - it / args.max_iter_num, 0)
+        agent_components['pi_scheduler'] = torch.optim.lr_scheduler.LambdaLR(agent_components['pi_optimizer'], lr_lambda=lr_lambda)
+        agent_components['vf_scheduler'] = torch.optim.lr_scheduler.LambdaLR(agent_components['vf_optimizer'], lr_lambda=lr_lambda)
+        agent_components['cvf_scheduler'] = torch.optim.lr_scheduler.LambdaLR(agent_components['cvf_optimizer'], lr_lambda=lr_lambda)
+    
+        agents_components.append(agent_components)
+        # Store hyperparameters for log
+        hyperparams = vars(args)
+    
+        # Initialize RunningStat for state normalization, score queue, logger
+        running_stat = RunningStats(clip=5)
+        score_queue = deque(maxlen=100)
+        cscore_queue = deque(maxlen=100)
+        logger = Logger(hyperparams, z)
+    
+        #initialize cost_lim as large as possible, and nu will start with 0. 
+        cost_lim = np.inf
+        # Initialize and train FOCOPS agent
+        agent = FOCOPS(agent_components['env'], agent_components['policy'], agent_components['value_net'], agent_components['cvalue_net'],
+                       agent_components['pi_optimizer'], agent_components['vf_optimizer'], agent_components['cvf_optimizer'],
+                       args.num_epochs, args.mb_size,
+                       args.c_gamma, args.lam, args.delta, args.eta,
+                       args.nu, args.nu_lr, args.nu_max, cost_lim,
+                       args.l2_reg, score_queue, cscore_queue, logger)
+        agents.append(agent)
+    
+        groups_returns = [0, 0]
+        start_time = time.time()
+        
+    for _ in range(args.rounds_of_update):
+        for z in range(len(agents)):
+            
+            agent = agents[z]
+            agent_components = agents_components[z]
+    
+            return_list = []
+            for iter in range(args.max_iter_num):
+                print('updating group: ', z)
+                
+                # Update iteration for model
+                agent.logger.save_model('iter', iter)
+        
+                # Collect trajectories
+                data_generator = DataGenerator(obs_dim, act_dim, args.batch_size, args.max_eps_len)
+                rollout = data_generator.run_traj(agent_components['env'], agent.policy, agent.value_net, agent.cvalue_net,
+                                                  running_stat, agent.score_queue, agent.cscore_queue,
+                                                  args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
+                                                  dtype, device, args.constraint)
+    
+                # update constraint threshold
+                return_list.append(rollout['avg_return'])
+    
+                z1 = 1-z
+    
+                b = np.zeros((2))
+                # # constraint threshold b when solving a CPO problem for a particular group z
+                b[0] = args.group_fairness_threshold + groups_returns[z1]
+                b[1] = args.group_fairness_threshold - groups_returns[z1]
+                agent.cost_lim = b[0]
+                # print('this is b:', b[0])
+        
+                # Update FOCOPS parameters
+                agent.update_params(rollout, dtype, device)
+        
+                # Update learning rates
+                agent_components['pi_scheduler'].step()
+                agent_components['vf_scheduler'].step()
+                agent_components['cvf_scheduler'].step()
+        
+                # Update time and running stat
+                agent.logger.update('time', time.time() - start_time)
+                agent.logger.update('running_stat', running_stat)
+        
+                # Save and print values
+                agent.logger.dump()
+            groups_returns[z] = np.mean(return_list)
+            # use the average return to compute the constraint threshold
+        
+"""
+    
+    # initialize groups_return for calculating the constraint threshold
+    groups_returns = [0, 0]
+    start_time = time.time()
+    
+    for _ in range(args.rounds_of_update):
+        for z in range(len(agents)):
+            agent = agents[z]
+            agent_components = agents_components[z]
+
+            return_list = []
+            for iter in range(args.max_iter_num):
+        
+                # Update iteration for model
+                agent.logger.save_model('iter', iter)
+        
+                # Collect trajectories
+                data_generator = DataGenerator(obs_dim, act_dim, args.batch_size, args.max_eps_len)
+                rollout = data_generator.run_traj(agent_components['env'], agent.policy, agent.value_net, agent.cvalue_net,
+                                                  running_stat, agent.score_queue, agent.cscore_queue,
+                                                  args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
+                                                  dtype, device, args.constraint)
+    
+                # update constraint threshold
+                return_list.append(rollout['avg_return'])
+    
+                z1 = 1-z
+    
+                b = np.zeros((2))
+                # constraint threshold b when solving a CPO problem for a particular group z
+                b[0] = args.group_fairness_threshold + groups_returns[z1]
+                b[1] = args.group_fairness_threshold - groups_returns[z1]
+                agent.cost_lim = b[0]
+                print('this is b:', b[0])
+        
+                # Update FOCOPS parameters
+                agent.update_params(rollout, dtype, device)
+        
+                # Update learning rates
+                agent_components['pi_scheduler'].step()
+                agent_components['vf_scheduler'].step()
+                agent_components['cvf_scheduler'].step()
+        
+                # Update time and running stat
+                agent.logger.update('time', time.time() - start_time)
+                agent.logger.update('running_stat', running_stat)
+        
+                # Save and print values
+                agent.logger.dump()
+            # use the average return to compute the constraint threshold
+            groups_returns[z] = np.mean(return_list)
+
+
+""" 
+    
+
+    
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
+    parser.add_argument('--group-fairness-threshold',type=float, default=1000,
+                       help='Maximum difference between the return of any two groups (Default: 1000)')
+    parser.add_argument('--rounds-of-update',type=float, default=200,
+                       help='The number of times policy from each group take turn to update')
+    
     parser.add_argument('--env-id', default='Humanoid-v3',
                         help='Name of Environment (default: Humanoid-v3')
     parser.add_argument('--constraint', default='velocity',
@@ -306,7 +526,9 @@ if __name__ == '__main__':
                         help='KL bound (default: 0.02)')
     parser.add_argument('--eta', type=float, default=0.02,
                         help='KL bound for indicator function (default: 0.02)')
-    parser.add_argument('--nu', type=float, default=0,
+    # parser.add_argument('--nu', type=float, default=0,
+    #                     help='Cost coefficient (default: 0)')
+    parser.add_argument('--nu', type=float, default=[0, 0],
                         help='Cost coefficient (default: 0)')
     parser.add_argument('--nu_lr', type=float, default=0.01,
                         help='Cost coefficient learning rate (default: 0.01)')

@@ -12,7 +12,7 @@ Implementation for Multi-Task Group Fairness Reinforcement Learning
 Example: HalfCheetah group and BigFoot HalfCheetah group under two tasks, one with default reward, the other with added penalty for action magnitude.
 
 ```
-python3 gf_mt_two_reward_functions.py --env-id='big_foot_half_cheetah' --batch-size=1024 --group-fairness-threshold=100 --constraint='group fairness' --max-iter-num=30
+python3 gf_mt_two_constraints.py --env-id='big_foot_half_cheetah' --batch-size=1024 --group-fairness-threshold=100 --max-iter-num=500
 ```
 
 

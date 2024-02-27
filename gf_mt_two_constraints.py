@@ -9,6 +9,7 @@ from environment import get_threshold
 from utils import *
 from collections import deque
 
+
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 
 import pickle
@@ -148,13 +149,15 @@ class FOCOPS:
                 ratio = torch.exp(logprob - old_logprob_b)
                 self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b - torch.sum(torch.tensor(self.nu.reshape(1, 2, 1)) * cadv_b, dim=1))) \
                           * (kl_new_old.detach() <= self.eta).type(dtype)
-
+                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b )) \
+                #           * (kl_new_old.detach() <= self.eta).type(dtype)
                 vars = {}
                 vars['nu'] = self.nu
                 vars['cadv_b'] = cadv_b
                 vars['adv_b'] = adv_b
                 # with open('vars.pkl', 'wb') as file:
                 #     pickle.dump(vars, file)
+                
                 # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * adv_b*(1.0 - self.nu[0]+self.nu[1])) \
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
 
@@ -208,8 +211,9 @@ def train(args):
     # envs for different groups
     envs = []
     # testing one env for now
-    envs.append(gym.make('HalfCheetah-v4'))
     envs.append(BigFootHalfCheetahEnv())
+    envs.append(gym.make('HalfCheetah-v4'))
+
 
     # for different environments for different the groups, the observation dimension and action dimension are the same. 
     obs_dim = envs[0].observation_space.shape[0]
@@ -253,7 +257,10 @@ def train(args):
 
     start_time = time.time()
     agents = []
-
+    pi_schedulers = []
+    vf_schedulers = []
+    cvf_schedulers = []
+    
     for z in range(args.num_groups):
         env = envs[z]
 
@@ -281,6 +288,11 @@ def train(args):
         pi_scheduler = torch.optim.lr_scheduler.LambdaLR(pi_optimizer, lr_lambda=lr_lambda)
         vf_scheduler = torch.optim.lr_scheduler.LambdaLR(vf_optimizer, lr_lambda=lr_lambda)
         cvf_scheduler = torch.optim.lr_scheduler.LambdaLR(cvf_optimizer, lr_lambda=lr_lambda)
+
+        pi_schedulers.append(pi_scheduler)
+        vf_schedulers.append(vf_scheduler)
+        cvf_schedulers.append(cvf_scheduler)
+        
         
         # Store hyperparameters for log
         hyperparams = vars(args)
@@ -289,7 +301,7 @@ def train(args):
         running_stat = RunningStats(clip=5)
         score_queue = deque(maxlen=100)
         cscore_queue = deque(maxlen=100)
-        logger = Logger(hyperparams)
+        logger = Logger(hyperparams, z)
 
         # logger = Logger(hyperparams, z)
         # Initialize and train FOCOPS agent
@@ -323,7 +335,7 @@ def train(args):
                 # agent.logger.save_model('iter', iter)
     
                 # sampling 10 times more trajectories when estimating return for the fairness constraint.         
-                data_generator = DataGenerator(obs_dim, act_dim, args.batch_size*10, args.max_eps_len)
+                data_generator = DataGenerator(obs_dim, act_dim, args.batch_size, args.max_eps_len)
                 rollouts = data_generator.run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
                                                   running_stat, agent.score_queue, agent.cscore_queue,
                                                   args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
@@ -371,9 +383,9 @@ def train(args):
                 print('current group return: ', rollouts['avg_return'])
                 print('b: ', b)
                 # Update learning rates
-                pi_scheduler.step()
-                vf_scheduler.step()
-                cvf_scheduler.step()
+                pi_schedulers[z].step()
+                vf_schedulers[z].step()
+                cvf_schedulers[z].step()
             
                 # Update time and running stat
                 agent.logger.update('time', time.time() - start_time)
@@ -407,7 +419,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
-    parser.add_argument('--group-fairness-threshold',type=float, default=100,
+    parser.add_argument('--group-fairness-threshold',type=float, default=1000,
                        help='Maximum difference between the return of any two groups (Default: 100)')
 
     parser.add_argument('--num-groups', default=2,

@@ -34,6 +34,8 @@ class Logger:
         self.iter = 0
         self.group = group
 
+        
+
 
 
     def update(self, key, value):
@@ -44,6 +46,35 @@ class Logger:
 
     def save_model(self, component, params):
         self.models[component] = params
+
+
+    def load_model(self):
+        constraint = self.hyperparams['constraint']
+        seed = self.hyperparams['seed']
+        
+        
+
+        # envname = env_id.partition(':')[-1] if ':' in env_id else env_id
+        envnames = ['HalfCheetah-v4', 'BigFootHalfCheetah']
+        envname = envnames[self.group]
+        # create a different log for different group 
+        # 'group', str(self.group),
+        directory = '_'.join(['focops', 'results'])
+        filename1 = '_'.join(['focops',  constraint, str(self.group),envname,  'log_data_seed', str(seed)]) + '.pkl'
+        filename2 = '_'.join(['focops',  constraint, str(self.group),envname,  'hyperparams_seed', str(seed)]) + '.pkl'
+        filename3 = '_'.join(['focops',  constraint, str(self.group),envname,  'models_seed', str(seed)]) + '.pth'
+
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+
+        # pickle.dump(self.log_data, open(os.path.join(directory, filename1), 'wb'))
+        # pickle.dump(self.hyperparams, open(os.path.join(directory, filename2), 'wb'))
+        self.models = torch.load(os.path.join(directory, filename3))
+
+        # Also load log data
+        self.log_data = pickle.load(open(os.path.join(directory, filename1), 'rb'))
+        
+        
 
 
     def dump(self):

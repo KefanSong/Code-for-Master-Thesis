@@ -84,7 +84,9 @@ class DataGenerator:
                     cost = rew
                     # cost_vector[0] = rew
                     # cost_vector[1] = -rew
-
+                elif constraint == 'inf':
+                    cost = 10**10
+                
                 ret_eps += rew
                 # cost_ret_eps += (c_gamma ** t) * cost
                 cost_ret_eps += cost
@@ -141,6 +143,7 @@ class DataGenerator:
             self.obs_buf[start_idx: end_idx], self.act_buf[start_idx: end_idx] = self.obs_eps, self.act_eps
             self.vtarg_buf[start_idx: end_idx], self.adv_buf[start_idx: end_idx] = vtarg_eps, adv_eps
             self.cvtarg_buf[start_idx: end_idx], self.cadv_buf[start_idx: end_idx] = cvtarg_eps, cadv_eps_stack
+
 
 
 
