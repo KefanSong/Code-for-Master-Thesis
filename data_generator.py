@@ -56,6 +56,8 @@ class DataGenerator:
         avg_eps_len = 0
         num_eps = 0
 
+        
+
         while batch_idx < self.batch_size:
             obs = env.reset()[0]
             if running_stat is not None:

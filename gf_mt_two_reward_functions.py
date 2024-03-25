@@ -98,6 +98,7 @@ class FOCOPS:
                                                  old_logprob, old_mean, old_std)
         loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=self.mb_size, shuffle=True)
         avg_cost = rollout['avg_cost']
+        
         print('avg_cost: ', avg_cost)
 
         # stack average cost for two constraints
@@ -123,7 +124,8 @@ class FOCOPS:
                 # Update N reward critics
                 # only update one value net for unit testing
 
-                for n in range(1):
+                # potential bug for why the second agent is not learning... 
+                for n in range(2):
                     value_net = self.value_net_list[n]
                     
                     mse_loss = nn.MSELoss()
@@ -157,6 +159,7 @@ class FOCOPS:
 
                 self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b[:, 0, :]*(1.0 - self.nu[0]+self.nu[1]) + adv_b[:, 1, :]*(1.0 - self.nu[2]+self.nu[3]))) \
                           * (kl_new_old.detach() <= self.eta).type(dtype)
+
 
                 self.pi_loss = self.pi_loss.mean()
                 self.pi_optimizer.zero_grad()
@@ -256,7 +259,8 @@ def train(args):
         pi_optimizer = torch.optim.Adam(policy.parameters(), args.pi_lr)
         vf_optimizer_list = []
         for n in range(2):
-            vf_optimizer_list.append(torch.optim.Adam(value_net.parameters(), args.vf_lr))
+            vf_optimizer_list.append(torch.optim.Adam(value_net_list[n].parameters(), args.vf_lr))
+            # vf_optimizer_list.append(torch.optim.Adam(value_net.parameters(), args.vf_lr))
         cvf_optimizer = torch.optim.Adam(cvalue_net.parameters(), args.cvf_lr)
         
         # Initialize learning rate scheduler
