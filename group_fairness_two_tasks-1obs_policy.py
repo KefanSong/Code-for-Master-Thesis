@@ -12,6 +12,11 @@ from collections import deque
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 
+import wandb
+
+wandb.login()
+wandb.init(project="Multi-Task Group Fairness")
+
 
 class FOCOPS:
     """
@@ -260,6 +265,8 @@ class FOCOPS:
         self.logger.update('nu0', self.nu[0])
         self.logger.update('nu1', self.nu[1])
 
+        
+        wandb.log({"AvgR": np.mean(np.sort(self.score_queue[0])), "AvgR2": np.mean(np.sort(self.score_queue[1]))})
 
         # Save models
         self.logger.save_model('policy_params', self.policy.state_dict())
@@ -395,9 +402,15 @@ def train(args, env_list, envname, load_model, cost_lim, group, score_queue, csc
         agent.logger.dump()
     return agent.logger.log_data['AvgR'][-1],agent.logger.log_data['AvgR2'][-1], agent.score_queue, agent.cscore_queue
 
+# def main(args):
 
+    
 
 if __name__ == '__main__':
+
+
+
+    
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
     parser.add_argument('--group-fairness-threshold',type=float, default=1000,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
