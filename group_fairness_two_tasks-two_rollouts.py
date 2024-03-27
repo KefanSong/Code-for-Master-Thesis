@@ -11,12 +11,13 @@ from models import GaussianPolicy, Value
 from environment import get_threshold
 from utils import *
 from collections import deque
-
+import wandb
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 
 wandb.login()
 wandb.init(project="mtgf2-threshold100")
+
 
 class FOCOPS:
     """
@@ -107,7 +108,7 @@ class FOCOPS:
         self.cscore_queue = cscore_queue
 
 
-    def update_params(self, rollout,rollout2, dtype, device):
+    def update_params(self, rollout,rollout2, dtype, device, group):
         
 
         # Convert data to tensor
@@ -462,7 +463,7 @@ def train(args, env_list, envname, load_model, cost_lim, group, score_queue, csc
                                           dtype, device, args.constraint)
 
         # Update FOCOPS parameters
-        agent.update_params(rollout, rollout2, dtype, device)
+        agent.update_params(rollout, rollout2, dtype, device, group)
 
         # Update learning rates
         pi_scheduler.step()
