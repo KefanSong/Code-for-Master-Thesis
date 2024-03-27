@@ -547,4 +547,6 @@ if __name__ == '__main__':
             cost_lim[2] = args.group_fairness_threshold + AvgR2
             cost_lim[3] = args.group_fairness_threshold - AvgR2
 
+            
+
             AvgR,AvgR2, score_queue_list[z], cscore_queue_list[z] = train(args, env_list, envname, True, cost_lim, z, score_queue_list[z], cscore_queue_list[z])

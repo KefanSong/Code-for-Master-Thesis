@@ -12,6 +12,11 @@ from collections import deque
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 
+import wandb
+
+wandb.login()
+wandb.init(project="tmlr-baseline")
+
 
 class FOCOPS:
     """
@@ -102,7 +107,7 @@ class FOCOPS:
         self.cscore_queue = cscore_queue
 
 
-    def update_params(self, rollout, dtype, device, group):
+    def update_params(self, rollout, dtype, device, group, epsilon):
         
 
         # Convert data to tensor
@@ -150,8 +155,12 @@ class FOCOPS:
         # avg_cost_stack = np.array((avg_cost, -avg_cost))
         
 
-        self.nu += self.nu_lr * (avg_cost_stack - self.cost_lim)
+        # self.nu += self.nu_lr * (avg_cost_stack - self.cost_lim)
 
+
+        # self.nu = np.clip(self.nu, a_min=0, a_max= self.nu_max)
+
+        self.nu -= self.nu_lr * (epsilon - return_diff)
 
         self.nu = np.clip(self.nu, a_min=0, a_max= self.nu_max)
         
@@ -225,8 +234,11 @@ class FOCOPS:
                 # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0*(1.0 - self.nu[0]+self.nu[1]) + adv_b1*(1.0 - self.nu[2]+self.nu[3]))) \
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
 
-                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0)) \
+                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0*(1.0 - self.nu[0]+self.nu[1]) + adv_b1)) \
                           * (kl_new_old.detach() <= self.eta).type(dtype)
+
+                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0)) \
+                #           * (kl_new_old.detach() <= self.eta).type(dtype)
 
 
 
@@ -264,6 +276,8 @@ class FOCOPS:
         # self.logger.update('nu', self.nu)
         self.logger.update('nu0', self.nu[0])
         self.logger.update('nu1', self.nu[1])
+
+        wandb.log({"Group"+str(group)+"AvgR": np.mean(np.sort(self.score_queue[0])), "Group"+str(group)+"AvgR2": np.mean(np.sort(self.score_queue[1]))})
 
 
         # Save models
@@ -383,7 +397,7 @@ def train(args, env_list, envname, load_model, cost_lim, group, score_queue, csc
 
         
         # Update FOCOPS parameters
-        agent.update_params(rollout, dtype, device, group)
+        agent.update_params(rollout, dtype, device, group, args.group_fairness_threshold)
 
         # Update learning rates
         pi_scheduler.step()
@@ -406,6 +420,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
     parser.add_argument('--group-fairness-threshold',type=float, default=1000,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
+    parser.add_argument('--comment', default='',
+                        help='modify the log file name of experiment with comment (default: ')
     
     parser.add_argument('--env-id', default='Humanoid-v3',
                         help='Name of Environment (default: Humanoid-v3')

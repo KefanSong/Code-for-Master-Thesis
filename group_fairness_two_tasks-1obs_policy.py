@@ -107,7 +107,7 @@ class FOCOPS:
         self.cscore_queue = cscore_queue
 
 
-    def update_params(self, rollout, dtype, device):
+    def update_params(self, rollout, dtype, device, group):
         
 
         # Convert data to tensor
@@ -266,7 +266,7 @@ class FOCOPS:
         self.logger.update('nu1', self.nu[1])
 
         
-        wandb.log({"AvgR": np.mean(np.sort(self.score_queue[0])), "AvgR2": np.mean(np.sort(self.score_queue[1]))})
+        wandb.log({"Group"+str(group)+"AvgR": np.mean(np.sort(self.score_queue[0])), "Group"+str(group)+"AvgR2": np.mean(np.sort(self.score_queue[1]))})
 
         # Save models
         self.logger.save_model('policy_params', self.policy.state_dict())
@@ -344,7 +344,8 @@ def train(args, env_list, envname, load_model, cost_lim, group, score_queue, csc
     running_stats = [RunningStats(clip=5),RunningStats(clip=5)]
     # score_queue = deque(maxlen=100)
     # cscore_queue = deque(maxlen=100)
-    logger = Logger(hyperparams, group)
+    # logger = Logger(hyperparams, group)
+    logger = Logger(hyperparams, group, comment = args.comment)
 
     # Get constraint bounds
     # cost_lim = get_threshold(envname, constraint=args.constraint)
@@ -385,7 +386,7 @@ def train(args, env_list, envname, load_model, cost_lim, group, score_queue, csc
 
         
         # Update FOCOPS parameters
-        agent.update_params(rollout, dtype, device)
+        agent.update_params(rollout, dtype, device, group)
 
         # Update learning rates
         pi_scheduler.step()
@@ -414,6 +415,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
     parser.add_argument('--group-fairness-threshold',type=float, default=1000,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
+    parser.add_argument('--comment', default='',
+                        help='modify the log file name of experiment with comment (default: ')
     
     parser.add_argument('--env-id', default='Humanoid-v3',
                         help='Name of Environment (default: Humanoid-v3')
@@ -514,7 +517,7 @@ if __name__ == '__main__':
         
     
 
-    for _ in range(1000):
+    for k in range(1000):
     # for _ in range(2):
         for z in range(2):
             env_list = envs[z]
@@ -523,5 +526,7 @@ if __name__ == '__main__':
             cost_lim[1] = args.group_fairness_threshold - AvgR
             cost_lim[2] = args.group_fairness_threshold + AvgR2
             cost_lim[3] = args.group_fairness_threshold - AvgR2
+
+            print('train iteration: ', k)
 
             AvgR,AvgR2, score_queue_list[z], cscore_queue_list[z] = train(args, env_list, envname, True, cost_lim, z, score_queue_list[z], cscore_queue_list[z])
