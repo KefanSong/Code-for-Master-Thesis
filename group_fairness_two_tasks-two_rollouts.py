@@ -15,6 +15,8 @@ from collections import deque
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 
+wandb.login()
+wandb.init(project="mtgf2-threshold100")
 
 class FOCOPS:
     """
@@ -275,11 +277,11 @@ class FOCOPS:
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
                 # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b1)) \
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
-                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0*(1.0 - self.nu[0]+self.nu[1]) + adv_b1*(1.0 - self.nu[2]+self.nu[3]))) \
-                #           * (kl_new_old.detach() <= self.eta).type(dtype)
-
-                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b_list[0])) \
+                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0*(1.0 - self.nu[0]+self.nu[1]) + adv_b1*(1.0 - self.nu[2]+self.nu[3]))) \
                           * (kl_new_old.detach() <= self.eta).type(dtype)
+
+                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b_list[0])) \
+                #           * (kl_new_old.detach() <= self.eta).type(dtype)
 
 
 
@@ -343,6 +345,8 @@ class FOCOPS:
         self.logger.update('nu0', self.nu[0])
         self.logger.update('nu1', self.nu[1])
 
+
+        wandb.log({"Group"+str(group)+"AvgR": np.mean(np.sort(self.score_queue[0])), "Group"+str(group)+"AvgR2": np.mean(np.sort(self.score_queue[1]))})
 
         # Save models
         self.logger.save_model('policy_params', self.policy.state_dict())
