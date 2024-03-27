@@ -15,7 +15,7 @@ from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 import wandb
 
 wandb.login()
-wandb.init(project="tmlr-baseline")
+wandb.init(project="tmlr-threshold100")
 
 
 class FOCOPS:
@@ -418,7 +418,7 @@ def train(args, env_list, envname, load_model, cost_lim, group, score_queue, csc
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
-    parser.add_argument('--group-fairness-threshold',type=float, default=1000,
+    parser.add_argument('--group-fairness-threshold',type=float, default=100,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
     parser.add_argument('--comment', default='',
                         help='modify the log file name of experiment with comment (default: ')
