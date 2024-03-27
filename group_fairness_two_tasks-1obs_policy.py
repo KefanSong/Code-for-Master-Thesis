@@ -15,7 +15,7 @@ from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 import wandb
 
 wandb.login()
-wandb.init(project="Multi-Task Group Fairness")
+wandb.init(project="mtgf")
 
 
 class FOCOPS:
