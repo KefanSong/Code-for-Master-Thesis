@@ -15,7 +15,7 @@ from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 import wandb
 
 wandb.login()
-wandb.init(project="mtgf")
+wandb.init(project="mtgf-threshold100")
 
 
 class FOCOPS:
@@ -222,11 +222,11 @@ class FOCOPS:
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
                 # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b1)) \
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
-                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0*(1.0 - self.nu[0]+self.nu[1]) + adv_b1*(1.0 - self.nu[2]+self.nu[3]))) \
-                #           * (kl_new_old.detach() <= self.eta).type(dtype)
-
-                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0)) \
+                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0*(1.0 - self.nu[0]+self.nu[1]) + adv_b1*(1.0 - self.nu[2]+self.nu[3]))) \
                           * (kl_new_old.detach() <= self.eta).type(dtype)
+
+                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0)) \
+                #           * (kl_new_old.detach() <= self.eta).type(dtype)
 
 
 
