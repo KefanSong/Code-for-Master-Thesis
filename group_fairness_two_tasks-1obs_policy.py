@@ -15,7 +15,7 @@ from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 import wandb
 
 wandb.login()
-wandb.init(project="mtgf-threshold100")
+wandb.init(project="mtgf-threshold1000")
 
 
 class FOCOPS:
