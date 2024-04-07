@@ -1,1 +1,0 @@
-{"fair_gap Task0": 0.03946656237849311, "_timestamp": 1712513621.8514419, "_runtime": 9769.548174858093, "_step": 7999, "Group0Task0AvgR": 2048.7289860789338, "fair_gap Task1": 143.20005718958532, "Group0Task1AvgR": 1719.2874719792787, "Group1Task0AvgR": 1883.7021583808853, "Group1Task1AvgR": 1743.918572994284, "_wandb": {"runtime": 9769}}
