@@ -15,7 +15,7 @@ from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 import wandb
 
 wandb.login()
-wandb.init(project="tmlr-threshold100")
+wandb.init(project="tmlr2-100")
 
 
 
@@ -41,7 +41,7 @@ class FOCOPS:
                  nu,
                  nu_lr,
                  nu_max,
-                 cost_lim,
+                 return_diff,
                  l2_reg,
                  score_queue,
                  cscore_queue,
@@ -96,7 +96,9 @@ class FOCOPS:
         self.lam = lam
         self.delta = delta
         self.eta = eta
-        self.cost_lim = cost_lim
+        # self.cost_lim = cost_lim
+        self.return_diff = return_diff
+
 
         self.nu = nu
         self.nu_lr = nu_lr
@@ -139,10 +141,10 @@ class FOCOPS:
         # avg_cost = rollout['avg_cost']
         avg_cost = rollout['avg_return']   
 
-        if group == 0:
-            return_diff = avg_cost[0] - avg_cost[1]
-        else:
-            return_diff = avg_cost[1] - avg_cost[0]
+        # if group == 0:
+        #     return_diff = avg_cost[0] - avg_cost[1]
+        # else:
+        #     return_diff = avg_cost[1] - avg_cost[0]
 
 
         # # Update nu
@@ -162,7 +164,15 @@ class FOCOPS:
 
         # self.nu = np.clip(self.nu, a_min=0, a_max= self.nu_max)
 
-        self.nu -= self.nu_lr * (epsilon - return_diff)
+        
+
+        print('avg_cost[0]', avg_cost[0])
+        print('avg_cost[1]', avg_cost[1])
+
+        print('return_diff:', self.return_diff)
+        print('eps-re_diff:', epsilon - self.return_diff)
+
+        self.nu -= self.nu_lr * (epsilon - self.return_diff)
 
         self.nu = np.clip(self.nu, a_min=0, a_max= self.nu_max)
         
@@ -236,7 +246,10 @@ class FOCOPS:
                 # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0*(1.0 - self.nu[0]+self.nu[1]) + adv_b1*(1.0 - self.nu[2]+self.nu[3]))) \
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
 
-                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0*(1.0 - self.nu[0]+self.nu[1]) + adv_b1)) \
+                # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0*(1.0 - self.nu[0]+self.nu[1]) + adv_b1)) \
+                #           * (kl_new_old.detach() <= self.eta).type(dtype)
+                
+                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0*(1.0 - self.nu[0]+self.nu[1]))) \
                           * (kl_new_old.detach() <= self.eta).type(dtype)
 
                 # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b0)) \
@@ -375,6 +388,9 @@ def train(args, env_list, envname, load_model, cost_lim, group, score_queue, csc
 
     start_time = time.time()
 
+
+    
+
     for iter in range(args.max_iter_num):
         print('updating group: ', group)
 
@@ -397,6 +413,7 @@ def train(args, env_list, envname, load_model, cost_lim, group, score_queue, csc
         #                                   args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
         #                                   dtype, device, args.constraint)
 
+        # return_diff = avg
         
         # Update FOCOPS parameters
         agent.update_params(rollout, dtype, device, group, args.group_fairness_threshold)
@@ -459,10 +476,10 @@ if __name__ == '__main__':
                         help='KL bound for indicator function (default: 0.02)')
     # parser.add_argument('--nu', type=float, default=0,
     #                     help='Cost coefficient (default: 0)')
-    parser.add_argument('--nu', type=float, default=[0, 0, 0, 0],
-                        help='Cost coefficient (default: 0)')
-    # parser.add_argument('--nu', type=float, default=[0, 0],
+    # parser.add_argument('--nu', type=float, default=[0, 0, 0, 0],
     #                     help='Cost coefficient (default: 0)')
+    parser.add_argument('--nu', type=float, default=[0, 0],
+                        help='Cost coefficient (default: 0)')
     parser.add_argument('--nu_lr', type=float, default=0.01,
                         help='Cost coefficient learning rate (default: 0.01)')
     parser.add_argument('--nu_max', type=float, default=2.0,
@@ -511,16 +528,22 @@ if __name__ == '__main__':
     cscore_queue_list = [deque(maxlen=100), deque(maxlen=100)]
 
     # To-Do: set it to sampled return without updating the policy
+    avg_return = [[0, 0],[0, 0]]
     for z in range(2):
         env_list = envs[z]
-        cost_lim = np.zeros(4)
+        return_diff = np.zeros(2)
+        
+        
 
-        cost_lim[0] = args.group_fairness_threshold + AvgR
-        cost_lim[1] = args.group_fairness_threshold - AvgR
-        cost_lim[2] = args.group_fairness_threshold + AvgR2
-        cost_lim[3] = args.group_fairness_threshold - AvgR2
+        return_diff[0] = avg_return[z][0] - avg_return[1-z][0]
+        return_diff[1] = avg_return[z][1] - avg_return[1-z][1]
+        # cost_lim[2] = avg_return[z][0] - avg_return[1-z][0]
+        # cost_lim[3] = avg_return[z][0] - avg_return[1-z][0]
 
-        AvgR,AvgR2, score_queue_list[z], cscore_queue_list[z] = train(args, env_list, envname, False, cost_lim, z, score_queue_list[z], cscore_queue_list[z])
+        AvgR,AvgR2, score_queue_list[z], cscore_queue_list[z] = train(args, env_list, envname, False, return_diff, z, score_queue_list[z], cscore_queue_list[z])
+
+        avg_return[z][0] =AvgR
+        avg_return[z][1] = AvgR2
         
     
 
@@ -528,10 +551,19 @@ if __name__ == '__main__':
     # for _ in range(2):
         for z in range(2):
             env_list = envs[z]
+            
+            return_diff = np.zeros(2)
+            
+            
     
-            cost_lim[0] = args.group_fairness_threshold + AvgR
-            cost_lim[1] = args.group_fairness_threshold - AvgR
-            cost_lim[2] = args.group_fairness_threshold + AvgR2
-            cost_lim[3] = args.group_fairness_threshold - AvgR2
+            return_diff[0] = avg_return[z][0] - avg_return[1-z][0]
+            return_diff[1] = avg_return[z][1] - avg_return[1-z][1]
+    
+            # cost_lim[0] = args.group_fairness_threshold + AvgR
+            # cost_lim[1] = args.group_fairness_threshold - AvgR
+            # cost_lim[2] = args.group_fairness_threshold + AvgR2
+            # cost_lim[3] = args.group_fairness_threshold - AvgR2
 
-            AvgR,AvgR2, score_queue_list[z], cscore_queue_list[z] = train(args, env_list, envname, True, cost_lim, z, score_queue_list[z], cscore_queue_list[z])
+            AvgR,AvgR2, score_queue_list[z], cscore_queue_list[z] = train(args, env_list, envname, True, return_diff, z, score_queue_list[z], cscore_queue_list[z])
+            avg_return[z][0] =AvgR
+            avg_return[z][1] = AvgR2

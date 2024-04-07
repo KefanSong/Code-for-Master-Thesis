@@ -108,7 +108,7 @@ class Logger:
         envname = envnames[self.group]
         # create a different log for different group 
         # 'group', str(self.group),
-        directory = '_'.join(['focops', 'results'])
+        directory = '_'.join(['foc3333ops', 'results'])
         filename1 = '_'.join(['focops',  constraint, str(self.group),envname,  'log_data_seed', str(seed)]) + self.comment+ '.pkl'
         filename2 = '_'.join(['focops',  constraint, str(self.group),envname,  'hyperparams_seed', str(seed)])  + '.pkl'
         filename3 = '_'.join(['focops',  constraint, str(self.group),envname,  'models_seed', str(seed)]) + '.pth'
