@@ -12,6 +12,6 @@
 #SBATCH --output hello.out            
 #SBATCH --ntasks 1   
                
-wandb agent Multi-Task Group Fairness
+wandb agent -p tmlr-100
 
 conda run -n gfrl3.8 python3 group_fairness_two_tasks-1obs_policy.py --env-id='big_foot_half_cheetah' --batch-size=1024 --constraint='group fairness' --max-iter-num=100 --seed=11
