@@ -16,7 +16,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="TwoTask-500")
+wandb.init(project="mtgf-1000")
 
 class FOCOPS:
     """
@@ -402,6 +402,7 @@ def save_avg_returns(avg_returns, filename='avg_returns.npz'):
 
 
 def train(args):
+    args.seed = wandb.config.seed
 
     # Initialize data type
     dtype = torch.float32
@@ -565,6 +566,7 @@ def train(args):
                     other_group_return = rollouts[z1][t]['avg_return']
     
     
+                wandb.log({"fair_gap Task"+str(t): np.abs(return_diff[-1])})
                 
                 other_group_return = fcpo[z0][t].update_params(rollouts[z0][t], dtype, device,return_diff,other_group_return, z0, t)
                 agent = fcpo[z0][t].agent
