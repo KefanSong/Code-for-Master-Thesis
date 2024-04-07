@@ -1,0 +1,5 @@
+program: group_fairness_two_tasks_rein_multi_1policy_en_baseline.py
+method: grid
+parameters:
+  seed:
+    values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]

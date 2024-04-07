@@ -18,6 +18,19 @@ import wandb
 wandb.login()
 wandb.init(project="tmlr-500-alternate")
 
+# sweep_configuration = {
+#     "method": "grid",
+#     # "name": "sweep",
+#     # "metric": {"goal": "maximize", "name": "val_acc"},
+#     "parameters": {
+#         "seed": {"values": [1, 2, 3]},
+#     },
+# }
+
+# sweep_id = wandb.sweep(sweep=sweep_configuration, project="tmlr-500-alternate")
+
+# wandb.agent(sweep_id, function=main, count=4)
+
 class FOCOPS:
     """
     Implement FOCOPS algorithm
@@ -402,6 +415,7 @@ def save_avg_returns(avg_returns, filename='avg_returns.npz'):
 
 
 def train(args):
+    args.seed = wandb.config.seed
 
     # Initialize data type
     dtype = torch.float32
