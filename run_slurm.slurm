@@ -10,7 +10,8 @@
 #SBATCH --mem=4G   #Adjust based on demands.
 #SBATCH --time=4-00:00:00
 #SBATCH --output hello.out            
-#SBATCH --ntasks 1                   
-wandb agent tmlr-threshold100
+#SBATCH --ntasks 1   
+               
+wandb agent Multi-Task Group Fairness
 
-conda run -n gfrl3.8 python3 group_fairness_two_tasks-tmlr.py --env-id='big_foot_half_cheetah' --batch-size=1024 --constraint='group fairness' --max-iter-num=100 --seed=1
+conda run -n gfrl3.8 python3 group_fairness_two_tasks-1obs_policy.py --env-id='big_foot_half_cheetah' --batch-size=1024 --constraint='group fairness' --max-iter-num=100 --seed=11
