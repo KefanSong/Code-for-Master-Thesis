@@ -25,7 +25,7 @@ class DataGenerator:
         self.vtarg_buf = np.zeros((batch_size, 1), dtype=np.float32)
         self.adv_buf = np.zeros((batch_size, 1), dtype=np.float32)
         self.cvtarg_buf = np.zeros((batch_size, 1), dtype=np.float32)
-        self.cadv_buf = np.zeros((batch_size,2, 1), dtype=np.float32)
+        self.cadv_buf = np.zeros((batch_size, 1), dtype=np.float32)
 
         # Episode buffer
         self.obs_eps = np.zeros((max_eps_len, obs_dim),  dtype=np.float32)
@@ -39,41 +39,36 @@ class DataGenerator:
 
         # Pointer
         self.ptr = 0
-
+    # TO-DO: Add task_id as input for run_traj
     def run_traj(self, env, policy, value_net, cvalue_net, running_stat,
                  score_queue, cscore_queue, gamma, c_gamma, gae_lam, c_gae_lam,
                  dtype, device, constraint):
 
         batch_idx = 0
-
         ret_hist = []
         cost_ret_hist = []
 
         avg_eps_len = 0
         num_eps = 0
 
+        self.ptr = 0 
+
+
         while batch_idx < self.batch_size:
-            obs = env.reset()[0]
-            print('env', env)
+            # changed reset output with env wrapper
+            obs = env.reset()
             if running_stat is not None:
                 obs = running_stat.normalize(obs)
             ret_eps = 0
             cost_ret_eps = 0
 
             for t in range(self.max_eps_len):
+                # TO-DO: add task_id to policy.get_act()
                 act = policy.get_act(torch.Tensor(obs).to(dtype).to(device))
                 act = torch_to_numpy(act).squeeze()
                 next_obs, rew, done, truncated, info = env.step(act)
-
-
-                # add another task: more energy efficient running
-                # add a higher penalty for actions with larger magnitude. 
                 
-                v = info['x_velocity']
-                rew2 = v - 0.3*np.abs(act).sum()
 
-                
-                cost_vector = [0]*2
                 if constraint == 'velocity':
                     if 'y_velocity' not in info:
                         cost = np.abs(info['x_velocity'])
@@ -82,15 +77,12 @@ class DataGenerator:
                 elif constraint == 'circle':
                     cost = info['cost']
                 elif constraint == 'group fairness':
-                    cost = rew
-                    # cost_vector[0] = rew
-                    # cost_vector[1] = -rew
-                elif constraint == 'inf':
-                    cost = 10**10
-                
+                    cost = 0
+
                 ret_eps += rew
-                # cost_ret_eps += (c_gamma ** t) * cost
-                cost_ret_eps += cost
+                cost_ret_eps += (c_gamma ** t) * cost
+
+                
 
                 if running_stat is not None:
                     next_obs = running_stat.normalize(next_obs)
@@ -112,11 +104,13 @@ class DataGenerator:
                     if done:
                         self.not_terminal = 0
                     score_queue.append(ret_eps)
+                    # collect return here?
+                    
                     cscore_queue.append(cost_ret_eps)
-
-                    # for group fairness, collect performance of (each agent's) return
-                    ret_hist.append(ret_eps)
                     cost_ret_hist.append(cost_ret_eps)
+
+                    ret_hist.append(ret_eps)
+                    # TO-DO: log episodic return, with group_id in run_traj input
 
                     num_eps += 1
                     avg_eps_len += (self.eps_len - avg_eps_len) / num_eps
@@ -132,20 +126,14 @@ class DataGenerator:
 
             # Calculate advantage
             adv_eps, vtarg_eps = self.get_advantage(value_net, gamma, gae_lam, dtype, device, mode='reward')
-            # cadv_eps, cvtarg_eps = self.get_advantage(cvalue_net, c_gamma, c_gae_lam, dtype, device, mode='cost')
-            cadv_eps, cvtarg_eps = self.get_advantage(value_net, c_gamma, c_gae_lam, dtype, device, mode='cost')
-            
-            # try stacking multiple cost advantage estimates. 
-            cadv_eps_stack = np.stack((cadv_eps, -cadv_eps), axis=1)
+            cadv_eps, cvtarg_eps = self.get_advantage(cvalue_net, c_gamma, c_gae_lam, dtype, device, mode='cost')
 
 
             # Update batch buffer
             start_idx, end_idx = self.ptr, self.ptr + self.eps_len
             self.obs_buf[start_idx: end_idx], self.act_buf[start_idx: end_idx] = self.obs_eps, self.act_eps
             self.vtarg_buf[start_idx: end_idx], self.adv_buf[start_idx: end_idx] = vtarg_eps, adv_eps
-            self.cvtarg_buf[start_idx: end_idx], self.cadv_buf[start_idx: end_idx] = cvtarg_eps, cadv_eps_stack
-
-
+            self.cvtarg_buf[start_idx: end_idx], self.cadv_buf[start_idx: end_idx] = cvtarg_eps, cadv_eps
 
 
             # Update pointer
@@ -160,53 +148,88 @@ class DataGenerator:
             self.eps_len = 0
             self.not_terminal = 1
 
-        # for group fairness, calculate average return
-        avg_ret = np.mean(ret_hist)
-        
         avg_cost = np.mean(cost_ret_hist)
         std_cost = np.std(cost_ret_hist)
 
+        # for group fairness, calculate average return
+        avg_ret = np.mean(ret_hist)
+
+
         # Normalize advantage functions
         self.adv_buf = (self.adv_buf - self.adv_buf.mean()) / (self.adv_buf.std() + 1e-6)
-        self.cadv_buf = (self.cadv_buf - self.cadv_buf.mean(axis=0)) / (self.cadv_buf.std(axis=0) + 1e-6)
+        self.cadv_buf = (self.cadv_buf - self.cadv_buf.mean()) / (self.cadv_buf.std() + 1e-6)
 
 
-        # for group fairness, added avg return
+        # env.close()
+
         return {'states':self.obs_buf, 'actions':self.act_buf,
                 'v_targets': self.vtarg_buf,'advantages': self.adv_buf,
                 'cv_targets': self.cvtarg_buf, 'c_advantages': self.cadv_buf,
                 'avg_cost': avg_cost, 'std_cost': std_cost, 'avg_eps_len': avg_eps_len, 'avg_return':avg_ret}
-    
 
-
+    # 
     def get_advantage(self, value_net, gamma, gae_lam, dtype, device, mode='reward'):
-        gae_delta = np.zeros((self.eps_len, 1))
-        adv_eps =  np.zeros((self.eps_len, 1))
-        # Check if terminal state, if terminal V(S_T) = 0, else V(S_T)
-        status = np.ones((self.eps_len, 1))
-        status[-1] = self.not_terminal
-        prev_adv = 0
+        if mode == 'reward':
+            gae_delta = np.zeros((self.eps_len, 1))
+            adv_eps =  np.zeros((self.eps_len, 1))
+            # Check if terminal state, if terminal V(S_T) = 0, else V(S_T)
+            status = np.ones((self.eps_len, 1))
+            status[-1] = self.not_terminal
+            prev_adv = 0
 
-        for t in reversed(range(self.eps_len)):
-            # Get value for current and next state
-            obs_tensor = torch.Tensor(self.obs_eps[t]).to(dtype).to(device)
-            next_obs_tensor = torch.Tensor(self.next_obs_eps[t]).to(dtype).to(device)
-            current_val, next_val = torch_to_numpy(value_net(obs_tensor), value_net(next_obs_tensor))
+            for t in reversed(range(self.eps_len)):
+                # Get value for current and next state
+                obs_tensor = torch.Tensor(self.obs_eps[t]).to(dtype).to(device)
+                next_obs_tensor = torch.Tensor(self.next_obs_eps[t]).to(dtype).to(device)
+                # print(self.task_id)
+                current_val, next_val = torch_to_numpy(value_net(obs_tensor), value_net(next_obs_tensor))
 
-            # Calculate delta and advantage
-            if mode == 'reward':
-                gae_delta[t] = self.rew_eps[t] + gamma * next_val * status[t] - current_val
-            elif mode =='cost':
-                gae_delta[t] = self.cost_eps[t] + gamma * next_val * status[t] - current_val
-            adv_eps[t] = gae_delta[t] + gamma * gae_lam * prev_adv
+                # Calculate delta and advantage
+                if mode == 'reward':
+                    gae_delta[t] = self.rew_eps[t] + gamma * next_val * status[t] - current_val
+                elif mode =='cost':
+                    gae_delta[t] = self.cost_eps[t] + gamma * next_val * status[t] - current_val
+                adv_eps[t] = gae_delta[t] + gamma * gae_lam * prev_adv
 
-            # Update previous advantage
-            prev_adv = adv_eps[t]
+                # Update previous advantage
+                prev_adv = adv_eps[t]
 
-        # Get target for value function
-        obs_eps_tensor = torch.Tensor(self.obs_eps).to(dtype).to(device)
-        vtarg_eps = torch_to_numpy(value_net(obs_eps_tensor)) + adv_eps
+            # Get target for value function
+            obs_eps_tensor = torch.Tensor(self.obs_eps).to(dtype).to(device)
+            vtarg_eps = torch_to_numpy(value_net(obs_eps_tensor)) + adv_eps
 
 
 
-        return adv_eps, vtarg_eps
+            return adv_eps, vtarg_eps
+        if mode == 'cost':
+            gae_delta = np.zeros((self.eps_len, 1))
+            adv_eps =  np.zeros((self.eps_len, 1))
+            # Check if terminal state, if terminal V(S_T) = 0, else V(S_T)
+            status = np.ones((self.eps_len, 1))
+            status[-1] = self.not_terminal
+            prev_adv = 0
+
+            for t in reversed(range(self.eps_len)):
+                # Get value for current and next state
+                obs_tensor = torch.Tensor(self.obs_eps[t]).to(dtype).to(device)
+                next_obs_tensor = torch.Tensor(self.next_obs_eps[t]).to(dtype).to(device)
+                # print(self.task_id)
+                current_val, next_val = torch_to_numpy(value_net(obs_tensor), value_net(next_obs_tensor))
+
+                # Calculate delta and advantage
+                if mode == 'reward':
+                    gae_delta[t] = self.rew_eps[t] + gamma * next_val * status[t] - current_val
+                elif mode =='cost':
+                    gae_delta[t] = self.cost_eps[t] + gamma * next_val * status[t] - current_val
+                adv_eps[t] = gae_delta[t] + gamma * gae_lam * prev_adv
+
+                # Update previous advantage
+                prev_adv = adv_eps[t]
+
+            # Get target for value function
+            obs_eps_tensor = torch.Tensor(self.obs_eps).to(dtype).to(device)
+            vtarg_eps = torch_to_numpy(value_net(obs_eps_tensor)) + adv_eps
+
+
+
+            return adv_eps, vtarg_eps

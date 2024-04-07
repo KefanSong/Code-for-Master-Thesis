@@ -292,6 +292,7 @@ class DataGenerator:
 
             
             # Update batch buffer
+            print('debug', self.ptr)
             start_idx, end_idx = self.ptr, self.ptr + self.eps_len
             self.obs_buf[start_idx: end_idx], self.act_buf[start_idx: end_idx] = self.obs_eps, self.act_eps
             self.obs_buf2[start_idx: end_idx] = self.obs_eps2
