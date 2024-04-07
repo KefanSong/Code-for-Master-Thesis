@@ -415,7 +415,7 @@ def save_avg_returns(avg_returns, filename='avg_returns.npz'):
 
 
 def train(args):
-    args.seed = wandb.config.seed
+    # args.seed = wandb.config.seed
 
     # Initialize data type
     dtype = torch.float32
