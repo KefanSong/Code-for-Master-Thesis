@@ -16,7 +16,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="tmlr-1000-1task")
+wandb.init(project="tmlr-500-1task")
 
 class FOCOPS:
     """
@@ -619,7 +619,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
-    parser.add_argument('--epsilon',type=float, default=1000,
+    parser.add_argument('--epsilon',type=float, default=500,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
     parser.add_argument('--rounds-of-update',type=float, default=5000,
                        help='The number of times policy from each group take turn to update')
@@ -674,7 +674,7 @@ if __name__ == '__main__':
                         help='Batch Size per Update (default: 2048)')
     parser.add_argument('--num-epochs', type=int, default=10,
                         help='Number of passes through each minibatch per update (default: 10)')
-    parser.add_argument('--max-iter-num', type=int, default=1000,
+    parser.add_argument('--max-iter-num', type=int, default=500,
                         help='Number of Main Iterations (default: 500)')
     parser.add_argument("--nu-init", type=float, default=0,
                         help="the initial nu parameter")
