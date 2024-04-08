@@ -577,8 +577,10 @@ def train(args):
                         continue
                     return_diff.append(rollouts[z0][t]['avg_return'] - rollouts[z1][t]['avg_return'])
                     other_group_return = rollouts[z1][t]['avg_return']
-    
-    
+
+                
+                wandb.log({"fair_gap Task"+str(t): np.abs(return_diff[-1])})
+                
                 # TO-DO: run rollouts, but don't update.
                 if t == 0:
                     other_group_return = fcpo[z0][t].update_params(rollouts[z0][t], dtype, device,return_diff,other_group_return, z0, t)
@@ -592,6 +594,11 @@ def train(args):
                     # Update time and running stat
                     agent.logger.update('time', time.time() - start_time)
                     agent.logger.update('running_stat', agent.running_stat)
+
+                    
+                    agent = fcpo[z0][1-t].agent
+                    # log the other task return to wandb
+                    wandb.log({"Group"+str(z0)+"Task"+str(1-t)+"AvgR": np.mean(np.sort(agent.score_queues[1-t]))})
     
                 # Save and print values
                 # agent.logger.dump()
@@ -667,7 +674,7 @@ if __name__ == '__main__':
                         help='Batch Size per Update (default: 2048)')
     parser.add_argument('--num-epochs', type=int, default=10,
                         help='Number of passes through each minibatch per update (default: 10)')
-    parser.add_argument('--max-iter-num', type=int, default=500,
+    parser.add_argument('--max-iter-num', type=int, default=1000,
                         help='Number of Main Iterations (default: 500)')
     parser.add_argument("--nu-init", type=float, default=0,
                         help="the initial nu parameter")
