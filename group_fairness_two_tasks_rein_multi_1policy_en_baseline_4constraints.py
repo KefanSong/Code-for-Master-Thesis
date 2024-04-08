@@ -16,7 +16,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="tmlr-100-fair-gap")
+wandb.init(project="mlgf-1000-4constraints")
 
 class FOCOPS:
     """
