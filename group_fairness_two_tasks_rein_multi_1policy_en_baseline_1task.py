@@ -16,7 +16,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="tmlr-100")
+wandb.init(project="tmlr-1000-1task")
 
 class FOCOPS:
     """
