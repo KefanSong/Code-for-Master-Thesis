@@ -16,7 +16,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="tmlr-100-4constraints")
+wandb.init(project="tmlr-1000-4constraints")
 
 class FOCOPS:
     """
@@ -254,9 +254,9 @@ class FOCOPS:
         # self.logger.update('nu', self.nu)
 
         # TO-DO: add task id as input to update params and wandb.
-        # wandb.log({"Group"+str(group_id)+"Task"+str(task_id)+"AvgR": np.mean(np.sort(self.score_queue))})
+        wandb.log({"Group"+str(group_id)+"Task"+str(task_id)+"AvgR": np.mean(np.sort(self.score_queue))})
 
-        # print({"Group"+str(group_id)+"Task"+str(task_id)+"AvgR": np.mean(np.sort(self.score_queue))})
+        print({"Group"+str(group_id)+"Task"+str(task_id)+"AvgR": np.mean(np.sort(self.score_queue))})
         
         # self.logger.update('nu0', self.nu[0])
         # self.logger.update('nu1', self.nu[1])
@@ -629,8 +629,9 @@ def train(args):
 
                     # print
 
-                    print('updating group:', z0)
-                    print('nu:', fcpo[z0][t].nu[z0])
+                    # print('updating group:', z0)
+                    # print('nu:', fcpo[z0][t].nu[z0])
+                    # print('returns:', rollouts[z0][t]['avg_return'], rollouts[z1][t]['avg_return'])
                 
                     # run rollouts, but don't update.
                     other_group_return = fcpo[z0][t].update_params(rollouts[z0][t],rollouts[z0][1-t], dtype, device,return_diff,other_group_return,other_group_other_task_return, z0, t)
@@ -678,7 +679,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
-    parser.add_argument('--epsilon',type=float, default=100,
+    parser.add_argument('--epsilon',type=float, default=1000,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
     parser.add_argument('--rounds-of-update',type=int, default=10,
                        help='The number of times policy from each group take turn to update')
