@@ -1,0 +1,49 @@
+{
+    "os": "macOS-14.0-arm64-arm-64bit",
+    "python": "3.9.18",
+    "heartbeatAt": "2024-04-10T18:51:11.323271",
+    "startedAt": "2024-04-10T18:51:07.770548",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/Users/Kefan/Desktop/pull from git/Code-for-Master-Thesis-Copy1/group_fairness_two_tasks_rein_multi_1policy_en_baseline_4constraints.py",
+    "codePathLocal": "group_fairness_two_tasks_rein_multi_1policy_en_baseline_4constraints.py",
+    "codePath": "group_fairness_two_tasks_rein_multi_1policy_en_baseline_4constraints.py",
+    "git": {
+        "remote": "git@github.com:KefanSong/Code-for-Master-Thesis.git",
+        "commit": "2cf04a33c1b1498584cd33cc52828952e83f011f"
+    },
+    "email": "33657636+garified@users.noreply.github.com",
+    "root": "/Users/Kefan/Desktop/pull from git/Code-for-Master-Thesis-Copy1",
+    "host": "Garys-Laptop.local",
+    "username": "Kefan",
+    "executable": "/Users/Kefan/miniconda3/envs/torch/bin/python3",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 3504,
+        "min": 600,
+        "max": 3504
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 3504,
+            "min": 600,
+            "max": 3504
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 460.4317207336426,
+            "used": 250.32423782348633
+        }
+    },
+    "gpuapple": {
+        "type": "arm",
+        "vendor": "Apple"
+    },
+    "memory": {
+        "total": 16.0
+    }
+}

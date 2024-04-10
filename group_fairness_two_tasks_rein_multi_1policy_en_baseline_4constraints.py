@@ -85,7 +85,7 @@ class FOCOPS:
         self.epsilon = epsilon
         # second dimension of nu to be 4
         # self.nu = np.ones((self.num_subgroups - 1, 2)) * initial_nu_value
-        self.nu = np.ones((self.num_subgroups - 1, 4)) * initial_nu_value
+        self.nu = np.ones((self.num_subgroups, 4)) * initial_nu_value
         
     # add the second rollout as input; the other group return on the second task as input
     def update_params(self, rollout,rollout2, dtype, device,return_diff, other_group_return,other_group_other_task_return, group_id, task_id):
@@ -119,6 +119,7 @@ class FOCOPS:
         # TO-DO: avg_cost2 for rollout2
         avg_cost2 = rollout2['avg_return']
 
+
         
         #change to return
 
@@ -131,18 +132,19 @@ class FOCOPS:
         #     self.nu[z][1] -= self.nu_lr * (self.epsilon + return_diff[z])
         #     self.nu[z][1] = max(min(self.nu[z][1], self.nu_max), 0)
 
-        for z in range(self.num_subgroups - 1):
-            self.nu[z][0] -= self.nu_lr * (self.epsilon + other_group_return - avg_cost)
-            self.nu[z][0] = max(min(self.nu[z][0], self.nu_max), 0)
-            self.nu[z][1] -= self.nu_lr * (self.epsilon - other_group_return + avg_cost)
-            self.nu[z][1] = max(min(self.nu[z][1], self.nu_max), 0)
+        # for z in range(self.num_subgroups - 1):
+        z = group_id
+        self.nu[z][0] -= self.nu_lr * (self.epsilon + other_group_return - avg_cost)
+        self.nu[z][0] = max(min(self.nu[z][0], self.nu_max), 0)
+        self.nu[z][1] -= self.nu_lr * (self.epsilon - other_group_return + avg_cost)
+        self.nu[z][1] = max(min(self.nu[z][1], self.nu_max), 0)
 
-            # update nu for second task constraints
-        
-            self.nu[z][2] -= self.nu_lr * (self.epsilon + other_group_other_task_return - avg_cost2)
-            self.nu[z][2] = max(min(self.nu[z][0], self.nu_max), 0)
-            self.nu[z][3] -= self.nu_lr * (self.epsilon - other_group_other_task_return + avg_cost2)
-            self.nu[z][3] = max(min(self.nu[z][1], self.nu_max), 0)
+        # update nu for second task constraints
+    
+        self.nu[z][2] -= self.nu_lr * (self.epsilon + other_group_other_task_return - avg_cost2)
+        self.nu[z][2] = max(min(self.nu[z][2], self.nu_max), 0)
+        self.nu[z][3] -= self.nu_lr * (self.epsilon - other_group_other_task_return + avg_cost2)
+        self.nu[z][3] = max(min(self.nu[z][3], self.nu_max), 0)
 
         
         
@@ -208,6 +210,8 @@ class FOCOPS:
                 adv_coefficient2 = 0
                 for z in range(self.num_subgroups - 1):
                     adv_coefficient2 += (-self.nu[z][2] + self.nu[z][3])
+
+
 
 
                 
@@ -623,7 +627,11 @@ def train(args):
                     wandb.log({"fair_gap Task"+str(t): np.abs(return_diff[-1])})
                     
 
-                    
+                    # print
+
+                    print('updating group:', z0)
+                    print('nu:', fcpo[z0][t].nu[z0])
+                
                     # run rollouts, but don't update.
                     other_group_return = fcpo[z0][t].update_params(rollouts[z0][t],rollouts[z0][1-t], dtype, device,return_diff,other_group_return,other_group_other_task_return, z0, t)
                     agent = fcpo[z0][t].agent
@@ -670,9 +678,9 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
-    parser.add_argument('--epsilon',type=float, default=1000,
+    parser.add_argument('--epsilon',type=float, default=100,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
-    parser.add_argument('--rounds-of-update',type=int, default=1,
+    parser.add_argument('--rounds-of-update',type=int, default=10,
                        help='The number of times policy from each group take turn to update')
     
     parser.add_argument('--env-id', default='Humanoid-v3',
