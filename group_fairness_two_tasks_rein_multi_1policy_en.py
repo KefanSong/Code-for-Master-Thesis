@@ -294,8 +294,8 @@ def make_envs(args):
     envs = []
     tasks = []
     for t in range(2):
-        env = gym.make('HalfCheetah-v4', render_mode='rgb_array')
-        # env = gym.make('HalfCheetah-v4')
+        # env = gym.make('HalfCheetah-v4', render_mode='rgb_array')
+        env = gym.make('HalfCheetah-v4')
 
         env = HalfCheetahRewardWrapper(env, t)
         # env = gym.wrappers.RecordVideo(env, video_folder='HC_T_en'+str(t), episode_trigger= lambda x: x % 50 == 0)
