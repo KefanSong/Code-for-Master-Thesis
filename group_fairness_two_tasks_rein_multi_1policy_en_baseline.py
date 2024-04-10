@@ -662,7 +662,7 @@ if __name__ == '__main__':
                         help='Lambda value for GAE for cost (Default: 0.95)')
     parser.add_argument('--l2-reg', type=float, default=1e-3,
                         help='L2 Regularization Rate (default: 1e-3)')
-    parser.add_argument('--pi-lr', type=float, default=3e-4,
+    parser.add_argument('--pi-lr', type=float, default=1e-4,
                         help='Learning Rate for policy (default: 3e-4)')
     parser.add_argument('--vf-lr', type=float, default=3e-4,
                         help='Learning Rate for value function (default: 3e-4)')
