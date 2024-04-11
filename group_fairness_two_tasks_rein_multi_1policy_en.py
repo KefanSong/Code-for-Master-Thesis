@@ -10,13 +10,15 @@ from utils import *
 from collections import deque
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
+from huge_gravity_half_cheetah_v4 import HugeGravityHalfCheetah
+from ten_fric_half_cheetah_v4 import TenFricHalfCheetah
 from collections import deque
 from itertools import combinations
 import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="mtgf-500")
+wandb.init(project="mtgf-1000-HugeGravity")
 
 class FOCOPS:
     """
@@ -306,7 +308,8 @@ def make_envs(args):
     
     tasks = []
     for t in range(2):
-        env = BigFootHalfCheetahEnv()
+        # env = BigFootHalfCheetahEnv()
+        env = HugeGravityHalfCheetah()
 
         env = HalfCheetahRewardWrapper(env, t)
         # envname = 'BigFootHalfCheetah'
@@ -599,7 +602,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
-    parser.add_argument('--epsilon',type=float, default=500,
+    parser.add_argument('--epsilon',type=float, default=1000,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
     parser.add_argument('--rounds-of-update',type=float, default=1,
                        help='The number of times policy from each group take turn to update')

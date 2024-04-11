@@ -86,7 +86,7 @@ class Value(nn.Module):
         v_out = self.v_head(mlp_out)
         return v_out
 
-#多value的
+
 class MutilValue(nn.Module):
     def __init__(self, obs_dim,num_tasks, hidden_sizes=(64, 64), activation='tanh'):
         super().__init__()

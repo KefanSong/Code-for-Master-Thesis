@@ -271,7 +271,7 @@ def make_envs(args):
                 obs = np.append(obs, [0, 1, 2, 3])
 
                 # reward = reward - 2 * info['x_velocity']
-                target_velocity = 50
+                target_velocity = 20
 
                 vel_reward = -1*np.abs(info['x_velocity'] - 0.1*target_velocity)/5*2 + 2
                 ctrl_cost = info['reward_ctrl']
@@ -279,7 +279,7 @@ def make_envs(args):
             else:
                 obs = np.append(obs, [4, 5, 6, 7])
 
-                target_velocity = 20
+                target_velocity = 100
                 vel_reward = -1*np.abs(info['x_velocity'] - 0.1*target_velocity) + 2
                 ctrl_cost = info['reward_ctrl']
                 reward = vel_reward + ctrl_cost
