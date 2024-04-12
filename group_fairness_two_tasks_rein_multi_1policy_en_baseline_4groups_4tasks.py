@@ -20,7 +20,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="mtgf-1000")
+wandb.init(project="mtgf-1000-4g4t")
 
 class FOCOPS:
     """
