@@ -99,15 +99,15 @@ class FOCOPS:
 
         rollout = rollouts[0]
         rollout2 = rollouts[1]
-        rollout3 = rollouts[2]
-        rollout4 = rollouts[3]
+        # rollout3 = rollouts[2]
+        # rollout4 = rollouts[3]
         
         # add a second adv. 
         adv2 = torch.Tensor(rollout2['advantages']).to(dtype).to(device).detach()
 
         # TO-DO: adv3 and adv4
-        adv3 = torch.Tensor(rollout3['advantages']).to(dtype).to(device).detach()
-        adv4 = torch.Tensor(rollout4['advantages']).to(dtype).to(device).detach()
+        # adv3 = torch.Tensor(rollout3['advantages']).to(dtype).to(device).detach()
+        # adv4 = torch.Tensor(rollout4['advantages']).to(dtype).to(device).detach()
         
         # Convert data to tensor
         obs = torch.Tensor(rollout['states']).to(dtype).to(device)
@@ -127,7 +127,7 @@ class FOCOPS:
         # TO-DO: add adv3, 4 into torch dataset
         
         # Store in TensorDataset for minibatch updates
-        dataset = torch.utils.data.TensorDataset(obs, act, vtarg, adv, adv2, adv3, adv4, cvtarg, cadv,
+        dataset = torch.utils.data.TensorDataset(obs, act, vtarg, adv, adv2, cvtarg, cadv,
                                                  old_logprob, old_mean, old_std)
         loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=self.mb_size, shuffle=True)
         # avg_cost = rollout['avg_cost']
@@ -138,8 +138,8 @@ class FOCOPS:
 
         # TO-DO: avg_cost3 and avg_cost4
 
-        avg_cost3 = rollout3['avg_return']
-        avg_cost4 = rollout4['avg_return']
+        # avg_cost3 = rollout3['avg_return']
+        # avg_cost4 = rollout4['avg_return']
         
         #change to return
 
@@ -169,15 +169,15 @@ class FOCOPS:
         self.nu[z][3] = max(min(self.nu[z][3], self.nu_max), 0)
 
 
-        self.nu[z][4] -= self.nu_lr * (self.epsilon - return_diff[2])
-        self.nu[z][4] = max(min(self.nu[z][4], self.nu_max), 0)
-        self.nu[z][5] -= self.nu_lr * (self.epsilon + return_diff[2])
-        self.nu[z][5] = max(min(self.nu[z][5], self.nu_max), 0)
+        # self.nu[z][4] -= self.nu_lr * (self.epsilon - return_diff[2])
+        # self.nu[z][4] = max(min(self.nu[z][4], self.nu_max), 0)
+        # self.nu[z][5] -= self.nu_lr * (self.epsilon + return_diff[2])
+        # self.nu[z][5] = max(min(self.nu[z][5], self.nu_max), 0)
 
-        self.nu[z][6] -= self.nu_lr * (self.epsilon - return_diff[3])
-        self.nu[z][6] = max(min(self.nu[z][6], self.nu_max), 0)
-        self.nu[z][7] -= self.nu_lr * (self.epsilon + return_diff[3])
-        self.nu[z][7] = max(min(self.nu[z][7], self.nu_max), 0)
+        # self.nu[z][6] -= self.nu_lr * (self.epsilon - return_diff[3])
+        # self.nu[z][6] = max(min(self.nu[z][6], self.nu_max), 0)
+        # self.nu[z][7] -= self.nu_lr * (self.epsilon + return_diff[3])
+        # self.nu[z][7] = max(min(self.nu[z][7], self.nu_max), 0)
 
         
         
@@ -197,7 +197,7 @@ class FOCOPS:
 
             
             # TO-DO: fetch adv_b3, adv_b4 from loader
-            for _, (obs_b, act_b, vtarg_b, adv_b, adv_b2, adv_b3, adv_b4, cvtarg_b, cadv_b,
+            for _, (obs_b, act_b, vtarg_b, adv_b, adv_b2, cvtarg_b, cadv_b,
                     old_logprob_b, old_mean_b, old_std_b) in enumerate(loader):
 
 
@@ -270,7 +270,7 @@ class FOCOPS:
 
 
                 # TO-DO: add adv_b2, 3, 4 times corresponding coefficient to policy update.                
-                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b * adv_coefficient + adv_b2 * adv_coefficient2 + adv_b3 * adv_coefficient3 + adv_b4 * adv_coefficient4)) \
+                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b * adv_coefficient)) \
                 * (kl_new_old.detach() <= self.eta).type(dtype)
 
 
