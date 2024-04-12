@@ -779,14 +779,16 @@ def train(args):
                                                   args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
                                                   dtype, device, args.constraint)
 
-                    agent = fcpo[z0][1-t].agent
-
-                    wandb.log({"Group"+str(z0)+"Task"+str(1-t)+"AvgR": np.mean(np.sort(agent.score_queues[1-t]))})
-                    # Also sample trajectories of the other task
-                    rollouts[z0][1-t] = data_gen[z0][1-t].run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
-                                                                      agent.running_stat, agent.score_queues[1-t], agent.cscore_queue,
-                                                                      args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
-                                                                      dtype, device, args.constraint)
+                    for t1 in range(num_tasks):
+                        if t != t1:
+                            agent = fcpo[z0][t1].agent
+        
+                            wandb.log({"Group"+str(z0)+"Task"+str(t1)+"AvgR": np.mean(np.sort(agent.score_queues[t1]))})
+                            # Also sample trajectories of the other task
+                            rollouts[z0][t1] = data_gen[z0][t1].run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
+                                                                              agent.running_stat, agent.score_queues[t1], agent.cscore_queue,
+                                                                              args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
+                                                                              dtype, device, args.constraint)
         
     save_avg_returns(avg_returns=avg_returns, filename='avg_returns.npz')
 
