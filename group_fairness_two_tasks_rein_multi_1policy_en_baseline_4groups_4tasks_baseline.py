@@ -20,7 +20,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="tmlr-1000-4g4t")
+wandb.init(project="mtgf-1000-4g4t")
 
 class FOCOPS:
     """
@@ -106,8 +106,8 @@ class FOCOPS:
         adv2 = torch.Tensor(rollout2['advantages']).to(dtype).to(device).detach()
 
         # TO-DO: adv3 and adv4
-        # adv3 = torch.Tensor(rollout3['advantages']).to(dtype).to(device).detach()
-        # adv4 = torch.Tensor(rollout4['advantages']).to(dtype).to(device).detach()
+        adv3 = torch.Tensor(rollout3['advantages']).to(dtype).to(device).detach()
+        adv4 = torch.Tensor(rollout4['advantages']).to(dtype).to(device).detach()
         
         # Convert data to tensor
         obs = torch.Tensor(rollout['states']).to(dtype).to(device)
@@ -127,7 +127,7 @@ class FOCOPS:
         # TO-DO: add adv3, 4 into torch dataset
         
         # Store in TensorDataset for minibatch updates
-        dataset = torch.utils.data.TensorDataset(obs, act, vtarg, adv, adv2, cvtarg, cadv,
+        dataset = torch.utils.data.TensorDataset(obs, act, vtarg, adv, adv2, adv3, adv4, cvtarg, cadv,
                                                  old_logprob, old_mean, old_std)
         loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=self.mb_size, shuffle=True)
         # avg_cost = rollout['avg_cost']
@@ -169,15 +169,15 @@ class FOCOPS:
         self.nu[z][3] = max(min(self.nu[z][3], self.nu_max), 0)
 
 
-        # self.nu[z][4] -= self.nu_lr * (self.epsilon - return_diff[2])
-        # self.nu[z][4] = max(min(self.nu[z][4], self.nu_max), 0)
-        # self.nu[z][5] -= self.nu_lr * (self.epsilon + return_diff[2])
-        # self.nu[z][5] = max(min(self.nu[z][5], self.nu_max), 0)
+        self.nu[z][4] -= self.nu_lr * (self.epsilon - return_diff[2])
+        self.nu[z][4] = max(min(self.nu[z][4], self.nu_max), 0)
+        self.nu[z][5] -= self.nu_lr * (self.epsilon + return_diff[2])
+        self.nu[z][5] = max(min(self.nu[z][5], self.nu_max), 0)
 
-        # self.nu[z][6] -= self.nu_lr * (self.epsilon - return_diff[3])
-        # self.nu[z][6] = max(min(self.nu[z][6], self.nu_max), 0)
-        # self.nu[z][7] -= self.nu_lr * (self.epsilon + return_diff[3])
-        # self.nu[z][7] = max(min(self.nu[z][7], self.nu_max), 0)
+        self.nu[z][6] -= self.nu_lr * (self.epsilon - return_diff[3])
+        self.nu[z][6] = max(min(self.nu[z][6], self.nu_max), 0)
+        self.nu[z][7] -= self.nu_lr * (self.epsilon + return_diff[3])
+        self.nu[z][7] = max(min(self.nu[z][7], self.nu_max), 0)
 
         
         
@@ -197,7 +197,7 @@ class FOCOPS:
 
             
             # TO-DO: fetch adv_b3, adv_b4 from loader
-            for _, (obs_b, act_b, vtarg_b, adv_b, adv_b2, cvtarg_b, cadv_b,
+            for _, (obs_b, act_b, vtarg_b, adv_b, adv_b2, adv_b3, adv_b4, cvtarg_b, cadv_b,
                     old_logprob_b, old_mean_b, old_std_b) in enumerate(loader):
 
 
@@ -270,7 +270,7 @@ class FOCOPS:
 
 
                 # TO-DO: add adv_b2, 3, 4 times corresponding coefficient to policy update.                
-                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b * adv_coefficient)) \
+                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b * adv_coefficient + adv_b2 * adv_coefficient2 + adv_b3 * adv_coefficient3 + adv_b4 * adv_coefficient4)) \
                 * (kl_new_old.detach() <= self.eta).type(dtype)
 
 
@@ -765,6 +765,7 @@ def train(args):
                     agent.logger.update('running_stat', agent.running_stat)
 
                     # TO-DO: send the other rollouts as input to update_params
+                    print('log group', z0, 'Task', t)
                     wandb.log({"Group"+str(z0)+"Task"+str(t)+"AvgR": np.mean(np.sort(agent.score_queues[t]))})
         
                     # Save and print values
@@ -778,15 +779,6 @@ def train(args):
                                                   agent.running_stat, agent.score_queues[t], agent.cscore_queue,
                                                   args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
                                                   dtype, device, args.constraint)
-
-                    # agent = fcpo[z0][1-t].agent
-
-                    # wandb.log({"Group"+str(z0)+"Task"+str(1-t)+"AvgR": np.mean(np.sort(agent.score_queues[1-t]))})
-                    # # Also sample trajectories of the other task
-                    # rollouts[z0][1-t] = data_gen[z0][1-t].run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
-                    #                                                   agent.running_stat, agent.score_queues[1-t], agent.cscore_queue,
-                    #                                                   args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
-                    #                                                   dtype, device, args.constraint)
                     for t1 in range(num_tasks):
                         if t != t1:
                             agent = fcpo[z0][t1].agent
