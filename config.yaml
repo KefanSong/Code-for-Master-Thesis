@@ -1,4 +1,4 @@
-program: group_fairness_two_tasks_rein_multi_1policy_en_baseline_1task.py
+program: group_fairness_two_tasks_rein_multi_1policy_en_baseline_4groups_2tasks.py
 method: grid
 parameters:
   seed:
