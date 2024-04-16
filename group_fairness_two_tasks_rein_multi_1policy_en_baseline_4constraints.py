@@ -90,7 +90,7 @@ class FOCOPS:
     # add the second rollout as input; the other group return on the second task as input
     def update_params(self, rollout,rollout2, dtype, device,return_diff, other_group_return,other_group_other_task_return, group_id, task_id):
 
-        # TO-DO add a second adv. 
+        # add a second adv. 
         adv2 = torch.Tensor(rollout2['advantages']).to(dtype).to(device).detach()
         
         # Convert data to tensor
@@ -107,7 +107,7 @@ class FOCOPS:
         old_logprob, old_mean, old_std = graph_detach(old_logprob, old_mean, old_std)
 
 
-        # TO-DO: add adv2 into torch dataset
+        # add adv2 into torch dataset
         
         # Store in TensorDataset for minibatch updates
         dataset = torch.utils.data.TensorDataset(obs, act, vtarg, adv, adv2, cvtarg, cadv,
@@ -192,7 +192,7 @@ class FOCOPS:
 
                 # Update policy
                 
-                # TO-DO: add task_id
+
                 logprob, mean, std = self.policy.logprob(obs_b, act_b)
                 kl_new_old = gaussian_kl(mean, std, old_mean_b, old_std_b)
                 ratio = torch.exp(logprob - old_logprob_b)
@@ -200,22 +200,26 @@ class FOCOPS:
                 # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b)) \
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
                 adv_coefficient = 1.0
-                for z in range(self.num_subgroups - 1):
-                    adv_coefficient += (-self.nu[z][0] + self.nu[z][1])
+
+                # TO-DO: set z to group_id. 
+                # for z in range(self.num_subgroups - 1):
+                #     adv_coefficient += (-self.nu[z][0] + self.nu[z][1])
+
+                z = group_id
+                adv_coefficient += (-self.nu[z][0] + self.nu[z][1])
+
+                # TO-DO: calculate adv_b2 and adv_coefficient2, and add it to the policy update. 
+                adv_coefficient2 = 0
+                # for z in range(self.num_subgroups - 1):
+                adv_coefficient2 += (-self.nu[z][2] + self.nu[z][3])
+
+                
                 # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b - self.nu[0] * cadv_b[:,0,:])) \
                 #           * (kl_new_old.detach() <= self.eta).type(dtype)
 
 
-                # TO-DO: calculate adv_b2 and adv_coefficient2, and add it to the policy update. 
-                adv_coefficient2 = 0
-                for z in range(self.num_subgroups - 1):
-                    adv_coefficient2 += (-self.nu[z][2] + self.nu[z][3])
-
-
-
-
-                
-                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b * adv_coefficient)) \
+                # TO-DO: use the objective with adv_2 and adv_coefficient2. 
+                self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b * adv_coefficient + adv_b2 * adv_coefficient2)) \
                 * (kl_new_old.detach() <= self.eta).type(dtype)
 
 
@@ -235,7 +239,7 @@ class FOCOPS:
 
             # Early stopping
 
-            # TO-DO: add task_id
+            # add task_id
             logprob, mean, std = self.policy.logprob(obs, act)
             kl_val = gaussian_kl(mean, std, old_mean, old_std).mean().item()
             if kl_val > self.delta:
@@ -435,6 +439,7 @@ def save_avg_returns(avg_returns, filename='avg_returns.npz'):
 
 
 def train(args):
+    args.seed = wandb.config.seed
 
     # Initialize data type
     dtype = torch.float32
@@ -483,7 +488,7 @@ def train(args):
 
     
     for z in range(num_subgroups):
-        # TO-DO: Need another loop for environments
+        # Need another loop for environments
         fcpo_tasks = []
         data_gen_tasks = []
         
@@ -601,10 +606,10 @@ def train(args):
         # ---------- Update the agents --------------
         # Note: can also update in a random update order
         for z0 in range(num_subgroups):
+            for _ in range(args.rounds_of_update):
+                for t in range(num_tasks):
 
-            for t in range(num_tasks):
-
-                for _ in range(args.rounds_of_update):
+                    
 
                     # gap_between_returns = [[]]*2
                     # fair_gap = [[]]*2
@@ -680,7 +685,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
     parser.add_argument('--epsilon',type=float, default=1000,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
-    parser.add_argument('--rounds-of-update',type=int, default=10,
+    parser.add_argument('--rounds-of-update',type=int, default=3,
                        help='The number of times policy from each group take turn to update')
     
     parser.add_argument('--env-id', default='Humanoid-v3',

@@ -10,7 +10,7 @@ from utils import *
 from collections import deque
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
-from huge_gravity_half_cheetah_v4 import HugeGravityHalfCheetah
+from huge_gravity_half_cheetah_v4 import HugeGravityHalfCheetahEnv
 from collections import deque
 from itertools import combinations
 import numpy as np
@@ -321,7 +321,7 @@ def make_envs(args):
     tasks = []
     for t in range(2):
         # env = BigFootHalfCheetahEnv()
-        env = HugeGravityHalfCheetah()
+        env = HugeGravityHalfCheetahEnv()
 
         env = HalfCheetahRewardWrapper(env, t)
         # envname = 'BigFootHalfCheetah'
@@ -428,7 +428,7 @@ def train(args):
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     
-    #创建环境
+
     # Need two envs for each group, maybe in a two dimensional array
     envs = make_envs(args=args)
     num_subgroups = 2
@@ -584,10 +584,11 @@ def train(args):
         # ---------- Update the agents --------------
         # Note: can also update in a random update order
         for z0 in range(num_subgroups):
+            for _ in range(args.rounds_of_update):
 
-            for t in range(num_tasks):
+                for t in range(num_tasks):
 
-                for _ in range(args.rounds_of_update):
+                
 
                     # gap_between_returns = [[]]*2
                     # fair_gap = [[]]*2
@@ -641,7 +642,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
     parser.add_argument('--epsilon',type=float, default=1000,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
-    parser.add_argument('--rounds-of-update',type=int, default=1,
+    parser.add_argument('--rounds-of-update',type=int, default=10,
                        help='The number of times policy from each group take turn to update')
     
     parser.add_argument('--env-id', default='Humanoid-v3',

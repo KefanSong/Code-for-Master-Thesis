@@ -154,14 +154,14 @@ class FOCOPS:
 
         # for z in range(self.num_subgroups - 1):
 
-        # TO-DO: change to return_diff[t]
+        # TO-DO: iterate over z and change to return_diff[z][t]
         z = group_id
         self.nu[z][0] -= self.nu_lr * (self.epsilon - return_diff[0])
         self.nu[z][0] = max(min(self.nu[z][0], self.nu_max), 0)
         self.nu[z][1] -= self.nu_lr * (self.epsilon + return_diff[0])
         self.nu[z][1] = max(min(self.nu[z][1], self.nu_max), 0)
 
-        # TO-DO: update nu for third and forth task constraints
+        # update nu for third and forth task constraints
     
         self.nu[z][2] -= self.nu_lr * (self.epsilon - return_diff[1])
         self.nu[z][2] = max(min(self.nu[z][2], self.nu_max), 0)
@@ -236,6 +236,8 @@ class FOCOPS:
                     adv_coefficient = 1.0
                 else:
                     adv_coefficient = 0
+
+                # TO-DO:  range(self.num_subgroups) for the following 4.
                 for z in range(self.num_subgroups - 1):
                     adv_coefficient += (-self.nu[z][0] + self.nu[z][1])
                 # self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b - self.nu[0] * cadv_b[:,0,:])) \
@@ -269,7 +271,7 @@ class FOCOPS:
                     adv_coefficient4 += (-self.nu[z][6] + self.nu[z][7])
 
 
-                # TO-DO: add adv_b2, 3, 4 times corresponding coefficient to policy update.                
+                # add adv_b2, times corresponding coefficient to policy update.                
                 self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (adv_b * adv_coefficient + adv_b2 * adv_coefficient2)) \
                 * (kl_new_old.detach() <= self.eta).type(dtype)
 
@@ -724,12 +726,14 @@ def train(args):
                     return_diff = []
                     # get diff of first wrt other
 
-                    # TO-DO: obtain max abs return_diff for each group
+                    # TO-DO: initialize return_diff num_group by num_task as 0.
                     all_return_diff = []
                     for t0 in range(num_tasks):
                         for z1 in range(num_subgroups):
                             if z0 == z1:
                                 continue
+
+                            # TO-DO: replace return difference for group z1
                             return_diff.append(rollouts[z0][t0]['avg_return'] - rollouts[z1][t0]['avg_return'])
                             
                             # other_group_return = rollouts[z1][t]['avg_return']
@@ -737,7 +741,8 @@ def train(args):
                             # other_group_all_tasks_return = rollouts[z1][:]['avg_return']
                             
     
-                            # TO-DO: all_return_diff
+
+                            
                         all_return_diff.append(max(np.abs(return_diff)))
                         
         
@@ -751,7 +756,6 @@ def train(args):
             
 
                     # TO-DO: send in all return diff as input, 
-                    # TO-DO: send all rollouts as input
                     other_group_return = fcpo[z0][t].update_params(rollouts[z0], dtype, device,return_diff,all_return_diff, z0, t)
                     agent = fcpo[z0][t].agent
                     #step
@@ -764,7 +768,7 @@ def train(args):
                     agent.logger.update('time', time.time() - start_time)
                     agent.logger.update('running_stat', agent.running_stat)
 
-                    # TO-DO: send the other rollouts as input to update_params
+
                     wandb.log({"Group"+str(z0)+"Task"+str(t)+"AvgR": np.mean(np.sort(agent.score_queues[t]))})
         
                     # Save and print values

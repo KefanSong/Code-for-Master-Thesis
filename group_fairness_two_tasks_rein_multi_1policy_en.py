@@ -10,8 +10,8 @@ from utils import *
 from collections import deque
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
-from huge_gravity_half_cheetah_v4 import HugeGravityHalfCheetah
-from ten_fric_half_cheetah_v4 import TenFricHalfCheetah
+from huge_gravity_half_cheetah_v4 import HugeGravityHalfCheetahEnv
+from ten_fric_half_cheetah_v4 import TenFricHalfCheetahEnv
 from collections import deque
 from itertools import combinations
 import numpy as np
@@ -309,7 +309,7 @@ def make_envs(args):
     tasks = []
     for t in range(2):
         # env = BigFootHalfCheetahEnv()
-        env = HugeGravityHalfCheetah()
+        env = HugeGravityHalfCheetahEnv()
 
         env = HalfCheetahRewardWrapper(env, t)
         # envname = 'BigFootHalfCheetah'
@@ -405,7 +405,7 @@ def save_avg_returns(avg_returns, filename='avg_returns.npz'):
 
 
 def train(args):
-    args.seed = wandb.config.seed
+    # args.seed = wandb.config.seed
 
     # Initialize data type
     dtype = torch.float32
@@ -556,42 +556,44 @@ def train(args):
         # Note: can also update in a random update order
 
         for z0 in range(num_subgroups):
+            for _ in range(args.rounds_of_update):
+            
 
-            for t in range(num_tasks):
-                
-                
-                return_diff = []
-                # get diff of first wrt other
-                for z1 in range(num_subgroups):
-                    if z0 == z1:
-                        continue
-                    return_diff.append(rollouts[z0][t]['avg_return'] - rollouts[z1][t]['avg_return'])
-                    other_group_return = rollouts[z1][t]['avg_return']
-    
-    
-                wandb.log({"fair_gap Task"+str(t): np.abs(return_diff[-1])})
-                
-                other_group_return = fcpo[z0][t].update_params(rollouts[z0][t], dtype, device,return_diff,other_group_return, z0, t)
-                agent = fcpo[z0][t].agent
-                #step
-                # 更新网络
-                agent.pi_scheduler.step()
-                agent.vf_scheduler.step()
-                agent.cvf_scheduler.step()
-                
-                # Update time and running stat
-                agent.logger.update('time', time.time() - start_time)
-                agent.logger.update('running_stat', agent.running_stat)
-    
-                # Save and print values
-                # agent.logger.dump()
-                env = envs[z0][t]
-                # agent = fcpo[z0].agent
-    
-                rollouts[z0][t] = data_gen[z0][t].run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
-                                              agent.running_stat, agent.score_queues[t], agent.cscore_queue,
-                                              args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
-                                              dtype, device, args.constraint, t)
+                for t in range(num_tasks):
+                    
+                    
+                    return_diff = []
+                    # get diff of first wrt other
+                    for z1 in range(num_subgroups):
+                        if z0 == z1:
+                            continue
+                        return_diff.append(rollouts[z0][t]['avg_return'] - rollouts[z1][t]['avg_return'])
+                        other_group_return = rollouts[z1][t]['avg_return']
+        
+        
+                    wandb.log({"fair_gap Task"+str(t): np.abs(return_diff[-1])})
+                    
+                    other_group_return = fcpo[z0][t].update_params(rollouts[z0][t], dtype, device,return_diff,other_group_return, z0, t)
+                    agent = fcpo[z0][t].agent
+                    #step
+                    # 更新网络
+                    agent.pi_scheduler.step()
+                    agent.vf_scheduler.step()
+                    agent.cvf_scheduler.step()
+                    
+                    # Update time and running stat
+                    agent.logger.update('time', time.time() - start_time)
+                    agent.logger.update('running_stat', agent.running_stat)
+        
+                    # Save and print values
+                    # agent.logger.dump()
+                    env = envs[z0][t]
+                    # agent = fcpo[z0].agent
+        
+                    rollouts[z0][t] = data_gen[z0][t].run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
+                                                  agent.running_stat, agent.score_queues[t], agent.cscore_queue,
+                                                  args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
+                                                  dtype, device, args.constraint, t)
         
     save_avg_returns(avg_returns=avg_returns, filename='avg_returns.npz')
 
