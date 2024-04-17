@@ -10,13 +10,14 @@ from utils import *
 from collections import deque
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
+from huge_gravity_half_cheetah_v4 import HugeGravityHalfCheetahEnv
 from collections import deque
 from itertools import combinations
 import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="mtgf-1000-4constraints")
+wandb.init(project="mtgf-1000-HugeGravity2")
 
 class FOCOPS:
     """
@@ -343,7 +344,8 @@ def make_envs(args):
     
     tasks = []
     for t in range(2):
-        env = BigFootHalfCheetahEnv()
+        # env = BigFootHalfCheetahEnv()
+        env = HugeGravityHalfCheetahEnv()
 
         env = HalfCheetahRewardWrapper(env, t)
         # envname = 'BigFootHalfCheetah'
@@ -439,7 +441,6 @@ def save_avg_returns(avg_returns, filename='avg_returns.npz'):
 
 
 def train(args):
-    args.seed = wandb.config.seed
 
     # Initialize data type
     dtype = torch.float32
