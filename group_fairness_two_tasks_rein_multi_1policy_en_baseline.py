@@ -17,7 +17,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="tmlr-500-HugeGravity")
+wandb.init(project="tmlr-500-BigFoot")
 
 # sweep_configuration = {
 #     "method": "grid",
@@ -645,7 +645,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
     parser.add_argument('--epsilon',type=float, default=500,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
-    parser.add_argument('--rounds-of-update',type=int, default=10,
+    parser.add_argument('--rounds-of-update',type=int, default=5,
                        help='The number of times policy from each group take turn to update')
     
     parser.add_argument('--env-id', default='Humanoid-v3',

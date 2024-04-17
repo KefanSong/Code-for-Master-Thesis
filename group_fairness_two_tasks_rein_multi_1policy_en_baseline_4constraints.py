@@ -11,15 +11,13 @@ from collections import deque
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 from huge_gravity_half_cheetah_v4 import HugeGravityHalfCheetahEnv
-from ten_fric_half_cheetah_v4 import TenFricHalfCheetahEnv
-
 from collections import deque
 from itertools import combinations
 import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="mtgf-500-HugeGravity")
+wandb.init(project="mtgf-500-BigFoot")
 
 class FOCOPS:
     """
@@ -346,8 +344,8 @@ def make_envs(args):
     
     tasks = []
     for t in range(2):
-        # env = BigFootHalfCheetahEnv()
-        env = HugeGravityHalfCheetahEnv()
+        env = BigFootHalfCheetahEnv()
+        # env = HugeGravityHalfCheetahEnv()
 
         env = HalfCheetahRewardWrapper(env, t)
         # envname = 'BigFootHalfCheetah'
@@ -443,10 +441,7 @@ def save_avg_returns(avg_returns, filename='avg_returns.npz'):
 
 
 def train(args):
-    try:
-        args.seed = wandb.config.seed
-    except:
-        contin=True
+
     # Initialize data type
     dtype = torch.float32
     torch.set_default_dtype(dtype)
@@ -647,7 +642,6 @@ def train(args):
                     other_group_return = fcpo[z0][t].update_params(rollouts[z0][t],rollouts[z0][1-t], dtype, device,return_diff,other_group_return,other_group_other_task_return, z0, t)
                     agent = fcpo[z0][t].agent
                     #step
-                    # 更新网络
                     agent.pi_scheduler.step()
                     agent.vf_scheduler.step()
                     agent.cvf_scheduler.step()
@@ -657,7 +651,7 @@ def train(args):
                     agent.logger.update('running_stat', agent.running_stat)
 
                     # TO-DO: send the other rollouts as input to update_params
-                    wandb.log({"Group"+str(z0)+"Task"+str(t)+"AvgR": np.mean(np.sort(agent.score_queues[t]))})
+                    # wandb.log({"Group"+str(z0)+"Task"+str(t)+"AvgR": np.mean(np.sort(agent.score_queues[t]))})
         
                     # Save and print values
                     # agent.logger.dump()
@@ -671,14 +665,14 @@ def train(args):
                                                   args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
                                                   dtype, device, args.constraint)
 
-                    agent = fcpo[z0][1-t].agent
+                    # agent = fcpo[z0][1-t].agent
 
-                    wandb.log({"Group"+str(z0)+"Task"+str(1-t)+"AvgR": np.mean(np.sort(agent.score_queues[1-t]))})
-                    # Also sample trajectories of the other task
-                    rollouts[z0][1-t] = data_gen[z0][1-t].run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
-                                                                      agent.running_stat, agent.score_queues[1-t], agent.cscore_queue,
-                                                                      args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
-                                                                      dtype, device, args.constraint)
+                    # wandb.log({"Group"+str(z0)+"Task"+str(1-t)+"AvgR": np.mean(np.sort(agent.score_queues[1-t]))})
+                    # # Also sample trajectories of the other task
+                    # rollouts[z0][1-t] = data_gen[z0][1-t].run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
+                    #                                                   agent.running_stat, agent.score_queues[1-t], agent.cscore_queue,
+                    #                                                   args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
+                    #                                                   dtype, device, args.constraint)
         
     save_avg_returns(avg_returns=avg_returns, filename='avg_returns.npz')
 
@@ -691,7 +685,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
     parser.add_argument('--epsilon',type=float, default=500,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
-    parser.add_argument('--rounds-of-update',type=int, default=10,
+    parser.add_argument('--rounds-of-update',type=int, default=5,
                        help='The number of times policy from each group take turn to update')
     
     parser.add_argument('--env-id', default='Humanoid-v3',
