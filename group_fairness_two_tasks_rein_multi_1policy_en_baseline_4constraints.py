@@ -11,13 +11,15 @@ from collections import deque
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 from huge_gravity_half_cheetah_v4 import HugeGravityHalfCheetahEnv
+from ten_fric_half_cheetah_v4 import TenFricHalfCheetahEnv
+
 from collections import deque
 from itertools import combinations
 import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="mtgf-500-BigFoot")
+wandb.init(project="mtgf-500-HugeGravity")
 
 class FOCOPS:
     """
@@ -344,8 +346,8 @@ def make_envs(args):
     
     tasks = []
     for t in range(2):
-        env = BigFootHalfCheetahEnv()
-        # env = HugeGravityHalfCheetahEnv()
+        # env = BigFootHalfCheetahEnv()
+        env = HugeGravityHalfCheetahEnv()
 
         env = HalfCheetahRewardWrapper(env, t)
         # envname = 'BigFootHalfCheetah'
@@ -441,7 +443,10 @@ def save_avg_returns(avg_returns, filename='avg_returns.npz'):
 
 
 def train(args):
-
+    try:
+        args.seed = wandb.config.seed
+    except:
+        contin=True
     # Initialize data type
     dtype = torch.float32
     torch.set_default_dtype(dtype)
@@ -686,7 +691,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
     parser.add_argument('--epsilon',type=float, default=500,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
-    parser.add_argument('--rounds-of-update',type=int, default=3,
+    parser.add_argument('--rounds-of-update',type=int, default=10,
                        help='The number of times policy from each group take turn to update')
     
     parser.add_argument('--env-id', default='Humanoid-v3',

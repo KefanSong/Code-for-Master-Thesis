@@ -17,7 +17,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="tmlr-500-BigFoot")
+wandb.init(project="tmlr-500-HugeGravity")
 
 # sweep_configuration = {
 #     "method": "grid",
@@ -320,8 +320,8 @@ def make_envs(args):
     
     tasks = []
     for t in range(2):
-        env = BigFootHalfCheetahEnv()
-        # env = HugeGravityHalfCheetahEnv()
+        # env = BigFootHalfCheetahEnv()
+        env = HugeGravityHalfCheetahEnv()
 
         env = HalfCheetahRewardWrapper(env, t)
         # envname = 'BigFootHalfCheetah'
@@ -417,7 +417,10 @@ def save_avg_returns(avg_returns, filename='avg_returns.npz'):
 
 
 def train(args):
-    # args.seed = wandb.config.seed
+    try:
+        args.seed = wandb.config.seed
+    except:
+        contin=True
 
     # Initialize data type
     dtype = torch.float32
