@@ -17,7 +17,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="mtgf-500-BigFoot")
+wandb.init(project="mtgf-500-HugeGravity")
 
 class FOCOPS:
     """
@@ -259,7 +259,7 @@ class FOCOPS:
         # self.logger.update('nu', self.nu)
 
         # TO-DO: add task id as input to update params and wandb.
-        # wandb.log({"Group"+str(group_id)+"Task"+str(task_id)+"AvgR": np.mean(np.sort(self.score_queue))})
+        wandb.log({"Group"+str(group_id)+"Task"+str(task_id)+"AvgR": np.mean(np.sort(self.score_queue))})
 
         # print({"Group"+str(group_id)+"Task"+str(task_id)+"AvgR": np.mean(np.sort(self.score_queue))})
         
