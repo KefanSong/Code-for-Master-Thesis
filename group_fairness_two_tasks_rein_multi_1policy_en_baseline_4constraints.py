@@ -17,7 +17,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="mtgf-1000-HugeGravity2")
+wandb.init(project="mtgf-500-BigFoot")
 
 class FOCOPS:
     """
@@ -344,8 +344,8 @@ def make_envs(args):
     
     tasks = []
     for t in range(2):
-        # env = BigFootHalfCheetahEnv()
-        env = HugeGravityHalfCheetahEnv()
+        env = BigFootHalfCheetahEnv()
+        # env = HugeGravityHalfCheetahEnv()
 
         env = HalfCheetahRewardWrapper(env, t)
         # envname = 'BigFootHalfCheetah'
@@ -684,7 +684,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch FOCOPS Implementation')
-    parser.add_argument('--epsilon',type=float, default=1000,
+    parser.add_argument('--epsilon',type=float, default=500,
                        help='Maximum difference between the return of any two groups (Default: 1000)')
     parser.add_argument('--rounds-of-update',type=int, default=3,
                        help='The number of times policy from each group take turn to update')
