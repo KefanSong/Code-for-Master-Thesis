@@ -11,13 +11,15 @@ from collections import deque
 
 from big_foot_half_cheetah_v4 import BigFootHalfCheetahEnv
 from huge_gravity_half_cheetah_v4 import HugeGravityHalfCheetahEnv
+from ten_fric_half_cheetah_v4 import TenFricHalfCheetahEnv
+
 from collections import deque
 from itertools import combinations
 import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="mtgf-500")
+wandb.init(project="mtgf-500-TenFric")
 
 class FOCOPS:
     """
@@ -344,8 +346,9 @@ def make_envs(args):
     
     tasks = []
     for t in range(2):
-        env = BigFootHalfCheetahEnv()
+        # env = BigFootHalfCheetahEnv()
         # env = HugeGravityHalfCheetahEnv()
+        env = TenFricHalfCheetahEnv()
 
         env = HalfCheetahRewardWrapper(env, t)
         # envname = 'BigFootHalfCheetah'
