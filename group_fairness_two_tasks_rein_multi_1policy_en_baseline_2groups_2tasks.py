@@ -283,6 +283,11 @@ class FOCOPS:
 
                 policy_update_term = adv_b * adv_coefficient + adv_b2 * adv_coefficient2
 
+                if task_id == 0:
+                    policy_update_term = adv_b
+                else:
+                    policy_update_term = adv_b2
+
                 # TO-DO: add adv_b2, 3, 4 times corresponding coefficient to policy update.                
                 self.pi_loss = (kl_new_old - (1 / self.lam) * ratio * (policy_update_term)) \
                 * (kl_new_old.detach() <= self.eta).type(dtype)
@@ -323,7 +328,7 @@ class FOCOPS:
         # self.logger.update('nu', self.nu)
 
         # TO-DO: add task id as input to update params and wandb.
-        # wandb.log({"Group"+str(group_id)+"Task"+str(task_id)+"AvgR": np.mean(np.sort(self.score_queue))})
+        wandb.log({"Group"+str(group_id)+"Task"+str(task_id)+"AvgR": np.mean(np.sort(self.score_queue))})
 
         # print({"Group"+str(group_id)+"Task"+str(task_id)+"AvgR": np.mean(np.sort(self.score_queue))})
         
@@ -358,6 +363,38 @@ def make_envs(args):
             super().__init__(env)
             self.task_id = task_id
     
+        # def step(self, action):
+        #     obs, reward, terminated, truncated, info = self.env.step(action)
+            
+            
+        #     # TO-DO: task 0 forward run, task 1 backward run;
+        #     #        task 2 slow walk, task 3 fast walk
+            
+        #     if self.task_id == 0:
+        #         obs = np.append(obs, [0, 1, 2, 3])
+
+            
+        #     elif self.task_id == 1:
+        #         obs = np.append(obs, [4, 5, 6, 7])
+        #         reward = reward - 2 * info['x_velocity']
+        #     elif self.task_id == 2:
+        #         obs = np.append(obs, [8, 9, 10, 11])
+
+        #         # reward = reward - 2 * info['x_velocity']
+        #         target_velocity = 0.3
+
+        #         vel_reward = -1*np.abs(info['x_velocity'] - target_velocity) + 0.3
+        #         ctrl_cost = info['reward_ctrl']
+        #         reward = vel_reward + ctrl_cost
+        #     else:
+        #         obs = np.append(obs, [12, 13, 14, 15])
+
+        #         target_velocity = 0.5
+        #         vel_reward = -1*np.abs(info['x_velocity'] - target_velocity)/5*3 + 0.3
+        #         ctrl_cost = info['reward_ctrl']
+        #         reward = vel_reward + ctrl_cost
+        #     return obs, reward, terminated, truncated, info
+            
         def step(self, action):
             obs, reward, terminated, truncated, info = self.env.step(action)
             
@@ -367,9 +404,22 @@ def make_envs(args):
             
             if self.task_id == 0:
                 obs = np.append(obs, [0, 1, 2, 3])
+                target_velocity = 0.3
+
+                vel_reward = -1*np.abs(info['x_velocity'] - target_velocity) + 0.3
+                ctrl_cost = info['reward_ctrl']
+                reward = vel_reward + ctrl_cost
+
+            
             elif self.task_id == 1:
                 obs = np.append(obs, [4, 5, 6, 7])
-                reward = reward - 2 * info['x_velocity']
+                
+                target_velocity = 0.6
+
+                vel_reward = -1*np.abs(info['x_velocity'] - target_velocity)/6*3 + 0.3
+                ctrl_cost = info['reward_ctrl']
+                reward = vel_reward + ctrl_cost
+
             elif self.task_id == 2:
                 obs = np.append(obs, [8, 9, 10, 11])
 
@@ -780,7 +830,7 @@ def train(args):
 
                     # TO-DO: send the other rollouts as input to update_params
                     print('log group', z0, 'Task', t)
-                    wandb.log({"Group"+str(z0)+"Task"+str(t)+"AvgR": np.mean(np.sort(agent.score_queues[t]))})
+                    # wandb.log({"Group"+str(z0)+"Task"+str(t)+"AvgR": np.mean(np.sort(agent.score_queues[t]))})
         
                     # Save and print values
                     # agent.logger.dump()
@@ -793,16 +843,16 @@ def train(args):
                                                   agent.running_stat, agent.score_queues[t], agent.cscore_queue,
                                                   args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
                                                   dtype, device, args.constraint)
-                    for t1 in range(num_tasks):
-                        if t != t1:
-                            agent = fcpo[z0][t1].agent
+                    # for t1 in range(num_tasks):
+                    #     if t != t1:
+                    #         agent = fcpo[z0][t1].agent
         
-                            wandb.log({"Group"+str(z0)+"Task"+str(t1)+"AvgR": np.mean(np.sort(agent.score_queues[t1]))})
-                            # Also sample trajectories of the other task
-                            rollouts[z0][t1] = data_gen[z0][t1].run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
-                                                                              agent.running_stat, agent.score_queues[t1], agent.cscore_queue,
-                                                                              args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
-                                                                              dtype, device, args.constraint)
+                    #         wandb.log({"Group"+str(z0)+"Task"+str(t1)+"AvgR": np.mean(np.sort(agent.score_queues[t1]))})
+                    #         # Also sample trajectories of the other task
+                    #         rollouts[z0][t1] = data_gen[z0][t1].run_traj(env, agent.policy, agent.value_net, agent.cvalue_net,
+                    #                                                           agent.running_stat, agent.score_queues[t1], agent.cscore_queue,
+                    #                                                           args.gamma, args.c_gamma, args.gae_lam, args.c_gae_lam,
+                    #                                                           dtype, device, args.constraint)
         
     save_avg_returns(avg_returns=avg_returns, filename='avg_returns.npz')
 
