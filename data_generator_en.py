@@ -66,7 +66,7 @@ class DataGenerator:
             for t in range(self.max_eps_len):
                 # TO-DO: add task_id to policy.get_act()
 
-                act = policy.get_act(torch.Tensor(obs).to(dtype).to(device), task_id)
+                act = policy.get_act(torch.Tensor(obs).to(dtype).to(device))
 
                 act = torch_to_numpy(act).squeeze()
                 next_obs, rew, done, truncated, info = env.step(act)
