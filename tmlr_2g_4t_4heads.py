@@ -18,7 +18,7 @@ import numpy as np
 
 import wandb
 wandb.login()
-wandb.init(project="tmlr-2g_4t_HugeGravity")
+wandb.init(project="tmlr-2g_4t_BigFoot")
 
 class FOCOPS:
     """
@@ -405,8 +405,8 @@ def make_envs(args):
     
     tasks = []
     for t in range(4):
-        # env = BigFootHalfCheetahEnv()
-        env = HugeGravityHalfCheetahEnv()
+        env = BigFootHalfCheetahEnv()
+        # env = HugeGravityHalfCheetahEnv()
 
         env = HalfCheetahRewardWrapper(env, t)
         # envname = 'BigFootHalfCheetah'
@@ -653,10 +653,11 @@ def train(args):
         # Note: can also update in a random update order
 
         for z0 in range(num_subgroups):
-            for _ in range(args.rounds_of_update):
+            
             
 
-                for t in range(num_tasks):
+            for t in range(num_tasks):
+                for _ in range(args.rounds_of_update):
                     
                     
                     return_diff = []
