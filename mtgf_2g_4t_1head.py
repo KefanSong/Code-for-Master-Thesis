@@ -344,7 +344,8 @@ def make_envs(args):
                 obs = np.append(obs, [0, 1, 2, 3])
             elif self.task_id == 1:
                 obs = np.append(obs, [4, 5, 6, 7])
-                reward = reward - 2 * info['x_velocity']
+                # reward = reward - 2 * info['x_velocity']
+                reward = reward - 4*info['x_velocity']
             elif self.task_id == 2:
                 obs = np.append(obs, [8, 9, 10, 11])
 
@@ -353,14 +354,14 @@ def make_envs(args):
 
                 vel_reward = -1*np.abs(info['x_velocity'] - target_velocity) + 0.3
                 ctrl_cost = info['reward_ctrl']
-                reward = (vel_reward + ctrl_cost) /3 * 20
+                reward = (vel_reward - ctrl_cost) /3 * 20
             else:
                 obs = np.append(obs, [12, 13, 14, 15])
 
                 target_velocity = 0.5
                 vel_reward = -1*np.abs(info['x_velocity'] - target_velocity)/5*3 + 0.3
                 ctrl_cost = info['reward_ctrl']
-                reward = (vel_reward + ctrl_cost) / 3 * 20
+                reward = (vel_reward - ctrl_cost) / 3 * 20
             return obs, reward, terminated, truncated, info
         def reset(self, **kwargs):
             obs = self.env.reset(**kwargs)[0]
